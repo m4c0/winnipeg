@@ -35,26 +35,28 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // TODO: detect stream type instead of guessing
+  // This allows usage of files with multiple streams (ex: OBS with two audio
+  // tracks)
+
   auto vidx =
       av_find_best_stream(*fmt_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
   if (vidx < 0) {
     silog::log(silog::error, "Could not find video stream");
     return 1;
   }
-
-  auto st = (*fmt_ctx)->streams[vidx];
-  auto vdec = avcodec_find_decoder(st->codecpar->codec_id);
+  auto vst = (*fmt_ctx)->streams[vidx];
+  auto vdec = avcodec_find_decoder(vst->codecpar->codec_id);
   if (!vdec) {
     silog::log(silog::error, "Could not find video codec");
     return 1;
   }
-
   hai::holder<AVCodecContext, deleter> vdec_ctx{avcodec_alloc_context3(vdec)};
   if (!*vdec_ctx) {
     silog::log(silog::error, "Could not allocate video codec context");
     return 1;
   }
-  if (avcodec_parameters_to_context(*vdec_ctx, st->codecpar) < 0) {
+  if (avcodec_parameters_to_context(*vdec_ctx, vst->codecpar) < 0) {
     silog::log(silog::error, "Could not copy video codec parameters");
     return 1;
   }
@@ -63,6 +65,32 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  silog::log(silog::info, "yay %s", vdec->name);
+  auto aidx =
+      av_find_best_stream(*fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+  if (aidx < 0) {
+    silog::log(silog::error, "Could not find video stream");
+    return 1;
+  }
+  auto ast = (*fmt_ctx)->streams[aidx];
+  auto adec = avcodec_find_decoder(ast->codecpar->codec_id);
+  if (!adec) {
+    silog::log(silog::error, "Could not find video codec");
+    return 1;
+  }
+  hai::holder<AVCodecContext, deleter> adec_ctx{avcodec_alloc_context3(adec)};
+  if (!*adec_ctx) {
+    silog::log(silog::error, "Could not allocate video codec context");
+    return 1;
+  }
+  if (avcodec_parameters_to_context(*adec_ctx, ast->codecpar) < 0) {
+    silog::log(silog::error, "Could not copy video codec parameters");
+    return 1;
+  }
+  if (avcodec_open2(*adec_ctx, adec, nullptr) < 0) {
+    silog::log(silog::error, "Could not open video codec");
+    return 1;
+  }
+
+  silog::log(silog::info, "yay V[%s] A[%s]", vdec->name, adec->name);
   return 0;
 }
