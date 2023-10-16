@@ -91,6 +91,15 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  if (!ast) {
+    silog::log(silog::error, "Missing audio stream");
+    return 1;
+  }
+  if (!vst) {
+    silog::log(silog::error, "Missing video stream");
+    return 1;
+  }
+
   silog::log(silog::info, "yay V[%s] A[%s]", vdec->name, adec->name);
   return 0;
 }
