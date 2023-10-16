@@ -78,6 +78,8 @@ void run(const char *filename) {
   assert_p(avcodec_open2(*adec_ctx, adec, nullptr),
            "Could not open video codec");
 
+  av_dump_format(*fmt_ctx, 0, filename, 0);
+
   hai::holder<AVFrame, deleter> frm{av_frame_alloc()};
   hai::holder<AVPacket, deleter> pkt{av_packet_alloc()};
 
