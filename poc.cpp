@@ -1,5 +1,6 @@
 #pragma leco tool
 #pragma leco add_include_dir "ffmpeg/include"
+#pragma leco add_library "ffmpeg/lib/libavcodec.dylib"
 #pragma leco add_library "ffmpeg/lib/libavformat.dylib"
 
 extern "C" {
@@ -16,6 +17,12 @@ import silog;
 struct deleter {
   void operator()(AVCodecContext *c) { avcodec_free_context(&c); }
   void operator()(AVFormatContext *c) { avformat_close_input(&c); }
+  void operator()(AVFrame *c) { av_frame_free(&c); }
+  void operator()(AVPacket *c) { av_packet_free(&c); }
+};
+struct unref {
+  void operator()(AVFrame *c) { av_frame_unref(c); }
+  void operator()(AVPacket *c) { av_packet_unref(c); }
 };
 
 inline void assert(bool cond, const char *msg) {
@@ -71,7 +78,45 @@ void run(const char *filename) {
   assert_p(avcodec_open2(*adec_ctx, adec, nullptr),
            "Could not open video codec");
 
-  silog::log(silog::info, "yay V[%s] A[%s]", vdec->name, adec->name);
+  hai::holder<AVFrame, deleter> frm{av_frame_alloc()};
+  hai::holder<AVPacket, deleter> pkt{av_packet_alloc()};
+
+  unsigned vcount{};
+  unsigned acount{};
+  while (av_read_frame(*fmt_ctx, *pkt) >= 0) {
+    hai::holder<AVPacket, unref> pref{*pkt};
+
+    // From FFMPEG docs: "For video, the packet contains exactly one frame. For
+    // audio, it contains an integer number of frames if each frame has a known
+    // fixed size (e.g. PCM or ADPCM data). If the audio frames have a variable
+    // size (e.g. MPEG audio), then it contains one frame."
+    if ((*pkt)->stream_index == vidx) {
+      vcount++;
+      assert_p(avcodec_send_packet(*vdec_ctx, *pkt),
+               "Error sending packet to decode");
+      while (true) {
+        auto res = avcodec_receive_frame(*vdec_ctx, *frm);
+        if (res >= 0) {
+          hai::holder<AVFrame, unref> fref{*frm};
+          // output video frame
+          continue;
+        }
+        if (res == AVERROR_EOF || AVERROR(EAGAIN))
+          break;
+        assert_p(res, "Error decoding video frame");
+      }
+    } else if ((*pkt)->stream_index == aidx) {
+      acount++;
+    }
+  }
+
+  // TODO: flush decoders
+  // avcodec_send_packet(*vdec_ctx, nullptr);
+  // avcodec_send_packet(*adec_ctx, nullptr);
+  // then send/read
+
+  silog::log(silog::info, "yay V[%s/%d] A[%s/%d]", vdec->name, vcount,
+             adec->name, acount);
 }
 
 int main(int argc, char **argv) {
