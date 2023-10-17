@@ -60,12 +60,17 @@ public:
 
   void fetch_frame() {
     m_coro();
+
+    struct yuv {
+      unsigned char p[4];
+    };
+
     // auto frm = m_coro();
-    // vee::mapmem m{*m_smem};
-    // auto *c = static_cast<unsigned char *>(*m);
-    // for (auto i = 0; i < m_w * m_h * 4; i++) {
-    //   c[i] = (*img.data)[i];
-    // }
+    vee::mapmem m{*m_smem};
+    auto *c = static_cast<yuv *>(*m);
+    for (auto i = 0; i < m_ext.width * m_ext.height; i++) {
+      c[i] = yuv{{128, 0, 0, 0}};
+    }
   }
 
   void run(vee::command_buffer cb) {
@@ -209,6 +214,7 @@ void thread::run() {
 
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
+      mov.run(cb);
       vee::cmd_begin_render_pass({
           .command_buffer = cb,
           .render_pass = *rp,

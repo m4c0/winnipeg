@@ -9,6 +9,9 @@ layout(location = 0) out vec4 frag_colour;
 
 void main() {
   vec2 p = frag_coord;
+  vec2 uv = p * 0.5 + 0.5;
 
-  frag_colour = vec4(p * 0.5 + 0.5, 0, 1);
+  vec3 yuv = texture(movie, uv).rgb;
+
+  frag_colour = vec4(yuv, 1);
 }
