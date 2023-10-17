@@ -165,6 +165,6 @@ export coro play(const char *filename) {
   // avcodec_send_packet(*adec_ctx, nullptr);
   // then send/read
 
-  silog::log(silog::info, "yay V[%s/%d] A[%s/%d]", vdec->name, vcount,
+  silog::log(silog::info, "Movie ended V[%s/%d] A[%s/%d]", vdec->name, vcount,
              adec->name, acount);
 }
