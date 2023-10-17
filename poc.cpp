@@ -59,17 +59,26 @@ public:
   [[nodiscard]] bool done() const noexcept { return !m_coro; }
 
   void fetch_frame() {
-    m_coro();
+    auto frm = m_coro();
 
     struct yuv {
-      unsigned char p[4];
+      unsigned char y;
+      unsigned char u;
+      unsigned char v;
+      unsigned char pad;
     };
 
-    // auto frm = m_coro();
     vee::mapmem m{*m_smem};
     auto *c = static_cast<yuv *>(*m);
-    for (auto i = 0; i < m_ext.width * m_ext.height; i++) {
-      c[i] = yuv{{128, 0, 0, 0}};
+    // TODO: assert 4:2:0
+    // TODO: assert linesize > ext.w
+    for (auto y = 0; y < m_ext.height; y++) {
+      for (auto x = 0; x < m_ext.width; x++) {
+        auto &cc = c[y * m_ext.width + x];
+        cc.y = frm->data[0][y * frm->linesize[0] + x];
+        cc.u = cc.y;
+        cc.v = cc.y;
+      }
     }
   }
 
