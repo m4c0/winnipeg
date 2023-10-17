@@ -76,11 +76,13 @@ public:
     // TODO: assert 4:2:0
     // TODO: assert linesize > ext.w
     for (auto y = 0; y < m_ext.height; y++) {
+      auto y2 = y / 2;
       for (auto x = 0; x < m_ext.width; x++) {
+        auto x2 = x / 2;
         auto &cc = c[y * m_ext.width + x];
         cc.y = frm->data[0][y * frm->linesize[0] + x];
-        cc.u = cc.y;
-        cc.v = cc.y;
+        cc.u = frm->data[1][y2 * frm->linesize[1] + x2];
+        cc.v = frm->data[2][y2 * frm->linesize[2] + x2];
       }
     }
   }
