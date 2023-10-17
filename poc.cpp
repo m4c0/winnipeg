@@ -252,6 +252,8 @@ void thread::run() {
           .image_index = idx,
       });
     }
+
+    vee::device_wait_idle();
   }
 }
 
