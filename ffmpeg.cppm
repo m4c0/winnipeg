@@ -37,7 +37,47 @@ inline int assert_p(int i, const char *msg) {
   return i;
 }
 
-export coro<AVFrame *> play(const char *filename) {
+struct frame_size {
+  int width;
+  int height;
+};
+struct coro {
+  struct promise_type;
+  using handle_t = std::coroutine_handle<promise_type>;
+
+  struct promise_type {
+    AVFrame *value;
+    frame_size size;
+    bool failed;
+
+    coro get_return_object() { return {handle_t::from_promise(*this)}; }
+    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_always final_suspend() noexcept { return {}; }
+    std::suspend_always yield_value(AVFrame *v) {
+      value = v;
+      return {};
+    }
+    std::suspend_never yield_value(frame_size s) {
+      size = s;
+      return {};
+    }
+    void unhandled_exception() { failed = true; }
+  };
+
+  handle_t h;
+
+  auto failed() const noexcept { return h.promise().failed; }
+  auto size() const noexcept { return h.promise().size; }
+
+  explicit operator bool() { return !h.done() && !failed(); }
+  auto operator()() {
+    h.resume();
+    return h.promise().value;
+  }
+  ~coro() { h.destroy(); }
+};
+
+export coro play(const char *filename) {
   silog::log(silog::info, "Processing [%s]", filename);
 
   hai::holder<AVFormatContext, deleter> fmt_ctx{};
@@ -82,17 +122,10 @@ export coro<AVFrame *> play(const char *filename) {
 
   av_dump_format(*fmt_ctx, 0, filename, 0);
 
-  auto pix_fmt = (*vdec_ctx)->pix_fmt;
+  // auto pix_fmt = (*vdec_ctx)->pix_fmt;
   auto w = (*vdec_ctx)->width;
   auto h = (*vdec_ctx)->height;
-  auto buf_sz = assert_p(av_image_get_buffer_size(pix_fmt, w, h, 1),
-                         "Could not fetch buffer size");
-  silog::log(silog::debug, "buf size: %d - img size: %dx%d - pixies: %d",
-             buf_sz, w, h, w * h);
-  for (auto i = 0; i < 4; i++) {
-    auto ln_sz = av_image_get_linesize(pix_fmt, w, i);
-    silog::log(silog::debug, "%d line size: %d", i, ln_sz);
-  }
+  co_yield frame_size{w, h};
 
   hai::holder<AVFrame, deleter> frm{av_frame_alloc()};
   hai::holder<AVPacket, deleter> pkt{av_packet_alloc()};

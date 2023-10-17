@@ -38,30 +38,9 @@ struct suspend_always {
   constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
   constexpr void await_resume() const noexcept {}
 };
-} // namespace std
-
-export template <typename Tp> struct coro {
-  struct promise_type;
-  using handle_t = std::coroutine_handle<promise_type>;
-
-  struct promise_type {
-    Tp value;
-
-    coro get_return_object() { return {handle_t::from_promise(*this)}; }
-    std::suspend_always initial_suspend() { return {}; }
-    std::suspend_always final_suspend() noexcept { return {}; }
-    std::suspend_always yield_value(Tp v) {
-      value = v;
-      return {};
-    }
-    void unhandled_exception() {}
-  };
-
-  handle_t h;
-  explicit operator bool() { return !h.done(); }
-  auto operator()() {
-    h.resume();
-    return h.promise().value;
-  }
-  ~coro() { h.destroy(); }
+struct suspend_never {
+  constexpr bool await_ready() const noexcept { return true; }
+  constexpr void await_suspend(std::coroutine_handle<>) const noexcept {}
+  constexpr void await_resume() const noexcept {}
 };
+} // namespace std
