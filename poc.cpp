@@ -56,10 +56,13 @@ public:
 
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
 
-  [[nodiscard]] bool done() const noexcept { return !m_coro; }
-
   void fetch_frame() {
+    if (!m_coro)
+      return;
+
     auto frm = m_coro();
+    if (!m_coro)
+      return;
 
     struct yuv {
       unsigned char y;
@@ -83,6 +86,9 @@ public:
   }
 
   void run(vee::command_buffer cb) {
+    if (!m_coro)
+      return;
+
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);
     vee::cmd_copy_buffer_to_image(cb, m_ext, *m_sbuf, *m_img);
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_transfer_to_fragment);
@@ -140,7 +146,7 @@ void thread::run() {
   movie mov{pd};
   vee::update_descriptor_set(dset, 0, mov.iv(), *smp);
 
-  while (!interrupted() && !mov.done()) {
+  while (!interrupted()) {
     // Generic pipeline stuff
     vee::shader_module vert =
         vee::create_shader_module_from_resource("quad.vert.spv");
@@ -209,7 +215,7 @@ void thread::run() {
     };
 
     m_resized = false;
-    while (!interrupted() && !m_resized && !mov.done()) {
+    while (!interrupted() && !m_resized) {
       vee::wait_and_reset_fence(*f);
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
