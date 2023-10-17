@@ -11,6 +11,7 @@ extern "C" {
 #include <libavutil/timestamp.h>
 }
 
+import coro;
 import hai;
 import silog;
 
@@ -35,7 +36,7 @@ inline int assert_p(int i, const char *msg) {
   return i;
 }
 
-void run(const char *filename) {
+coro<AVFrame *> run(const char *filename) {
   silog::log(silog::info, "Processing [%s]", filename);
 
   hai::holder<AVFormatContext, deleter> fmt_ctx{};
@@ -101,6 +102,7 @@ void run(const char *filename) {
         if (res >= 0) {
           hai::holder<AVFrame, unref> fref{*frm};
           // output video frame
+          co_yield *frm;
           continue;
         }
         if (res == AVERROR_EOF || AVERROR(EAGAIN))
@@ -127,7 +129,11 @@ int main(int argc, char **argv) {
     return 1;
   }
   try {
-    run(argv[1]);
+    auto c = run(argv[1]);
+    while (c) {
+      auto frm = c();
+      silog::log(silog::info, "%d", frm->width);
+    }
     return 0;
   } catch (...) {
     return 1;
