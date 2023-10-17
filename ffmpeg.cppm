@@ -41,7 +41,7 @@ struct frame_size {
   int width;
   int height;
 };
-struct coro {
+export struct coro {
   struct promise_type;
   using handle_t = std::coroutine_handle<promise_type>;
 
@@ -69,7 +69,7 @@ struct coro {
   auto failed() const noexcept { return h.promise().failed; }
   auto size() const noexcept { return h.promise().size; }
 
-  explicit operator bool() { return !h.done() && !failed(); }
+  explicit operator bool() const noexcept { return !h.done() && !failed(); }
   auto operator()() {
     h.resume();
     return h.promise().value;
