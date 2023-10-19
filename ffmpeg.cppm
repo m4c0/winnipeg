@@ -91,7 +91,7 @@ public:
     auto vst = (*fmt_ctx)->streams[vidx];
     auto t = static_cast<double>((*frm)->pts);
     auto tb = vst->time_base;
-    return t / av_q2d(tb);
+    return t * av_q2d(tb);
   }
 
   coro play();
