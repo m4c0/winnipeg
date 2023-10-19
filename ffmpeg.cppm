@@ -43,7 +43,7 @@ export struct player_promise {
   AVFrame *value;
   bool failed;
 
-  coro get_return_object() { return {coro::handle_type::from_promise(*this)}; }
+  coro get_return_object() { return coro::from_promise(*this); }
   std::suspend_never initial_suspend() { return {}; }
   std::suspend_always final_suspend() noexcept { return {}; }
   std::suspend_always yield_value(AVFrame *v) {
