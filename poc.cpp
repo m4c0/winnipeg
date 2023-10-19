@@ -40,6 +40,7 @@ public:
 };
 
 class movie {
+  player m_player;
   coro m_coro;
 
   vee::extent m_ext;
@@ -55,8 +56,10 @@ class movie {
   vee::image_view m_iv;
 
 public:
-  movie(vee::physical_device pd) : m_coro{play(input_filename)} {
-    auto [w, h] = m_coro.size();
+  movie(vee::physical_device pd)
+      : m_player{input_filename}, m_coro{m_player.play()} {
+    auto w = m_player.width();
+    auto h = m_player.height();
     m_ext = {static_cast<unsigned>(w), static_cast<unsigned>(h)};
 
     m_smp_conv = vee::create_sampler_yuv420p_conversion(pd);

@@ -37,17 +37,12 @@ inline int assert_p(int i, const char *msg) {
   return i;
 }
 
-struct frame_size {
-  int width;
-  int height;
-};
 export struct coro {
   struct promise_type;
   using handle_t = std::coroutine_handle<promise_type>;
 
   struct promise_type {
     AVFrame *value;
-    frame_size size;
     bool failed;
 
     coro get_return_object() { return {handle_t::from_promise(*this)}; }
@@ -57,17 +52,12 @@ export struct coro {
       value = v;
       return {};
     }
-    std::suspend_never yield_value(frame_size s) {
-      size = s;
-      return {};
-    }
     void unhandled_exception() { failed = true; }
   };
 
   handle_t h;
 
   auto failed() const noexcept { return h.promise().failed; }
-  auto size() const noexcept { return h.promise().size; }
 
   explicit operator bool() const noexcept { return !h.done() && !failed(); }
   auto operator()() {
@@ -76,11 +66,40 @@ export struct coro {
   }
   ~coro() { h.destroy(); }
 };
+export class player {
+  hai::holder<AVFormatContext, deleter> fmt_ctx{};
+  hai::holder<AVCodecContext, deleter> vdec_ctx{};
+  hai::holder<AVCodecContext, deleter> adec_ctx{};
+  hai::holder<AVFrame, deleter> frm{av_frame_alloc()};
+  int aidx;
+  int vidx;
 
-export coro play(const char *filename) {
+public:
+  explicit player(const char *filename);
+
+  void seek(double timestamp) {
+    auto vst = (*fmt_ctx)->streams[vidx];
+    auto tb = static_cast<int>(timestamp / av_q2d(vst->time_base));
+    assert_p(avformat_seek_file(*fmt_ctx, vidx, tb - 1, tb, tb + 1, 0),
+             "Failed to seek");
+  }
+
+  auto width() { return (*vdec_ctx)->width; }
+  auto height() { return (*vdec_ctx)->height; }
+
+  auto timestamp() {
+    auto vst = (*fmt_ctx)->streams[vidx];
+    auto t = static_cast<double>((*frm)->pts);
+    auto tb = vst->time_base;
+    return t / av_q2d(tb);
+  }
+
+  coro play();
+};
+
+player::player(const char *filename) {
   silog::log(silog::info, "Processing [%s]", filename);
 
-  hai::holder<AVFormatContext, deleter> fmt_ctx{};
   assert_p(avformat_open_input(&*fmt_ctx, filename, nullptr, nullptr),
            "Failed to read input file");
   assert_p(avformat_find_stream_info(*fmt_ctx, nullptr),
@@ -90,7 +109,7 @@ export coro play(const char *filename) {
   // This allows usage of files with multiple streams (ex: OBS with two audio
   // tracks)
 
-  auto vidx = assert_p(
+  vidx = assert_p(
       av_find_best_stream(*fmt_ctx, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0),
       "Could not find video stream");
   auto vst = (*fmt_ctx)->streams[vidx];
@@ -98,22 +117,21 @@ export coro play(const char *filename) {
   auto vdec = avcodec_find_decoder(vst->codecpar->codec_id);
   assert(vdec, "Could not find video codec");
 
-  hai::holder<AVCodecContext, deleter> vdec_ctx{avcodec_alloc_context3(vdec)};
+  *vdec_ctx = avcodec_alloc_context3(vdec);
   assert(*vdec_ctx, "Could not allocate video codec context");
   assert_p(avcodec_parameters_to_context(*vdec_ctx, vst->codecpar),
            "Could not copy video codec parameters");
   assert_p(avcodec_open2(*vdec_ctx, vdec, nullptr),
            "Could not open video codec");
 
-  auto aidx =
-      av_find_best_stream(*fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+  aidx = av_find_best_stream(*fmt_ctx, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
   assert_p(aidx, "Could not find video stream");
   auto ast = (*fmt_ctx)->streams[aidx];
   assert(ast, "Missing audio stream");
   auto adec = avcodec_find_decoder(ast->codecpar->codec_id);
   assert(adec, "Could not find audio codec");
 
-  hai::holder<AVCodecContext, deleter> adec_ctx{avcodec_alloc_context3(adec)};
+  *adec_ctx = avcodec_alloc_context3(adec);
   assert(*adec_ctx, "Could not allocate video codec context");
   assert_p(avcodec_parameters_to_context(*adec_ctx, ast->codecpar),
            "Could not copy video codec parameters");
@@ -121,17 +139,11 @@ export coro play(const char *filename) {
            "Could not open video codec");
 
   av_dump_format(*fmt_ctx, 0, filename, 0);
+}
 
-  // auto pix_fmt = (*vdec_ctx)->pix_fmt;
-  auto w = (*vdec_ctx)->width;
-  auto h = (*vdec_ctx)->height;
-  co_yield frame_size{w, h};
-
-  hai::holder<AVFrame, deleter> frm{av_frame_alloc()};
+coro player::play() {
   hai::holder<AVPacket, deleter> pkt{av_packet_alloc()};
 
-  unsigned vcount{};
-  unsigned acount{};
   while (av_read_frame(*fmt_ctx, *pkt) >= 0) {
     hai::holder<AVPacket, unref> pref{*pkt};
 
@@ -140,7 +152,6 @@ export coro play(const char *filename) {
     // fixed size (e.g. PCM or ADPCM data). If the audio frames have a variable
     // size (e.g. MPEG audio), then it contains one frame."
     if ((*pkt)->stream_index == vidx) {
-      vcount++;
       assert_p(avcodec_send_packet(*vdec_ctx, *pkt),
                "Error sending packet to decode");
       while (true) {
@@ -156,7 +167,6 @@ export coro play(const char *filename) {
         assert_p(res, "Error decoding video frame");
       }
     } else if ((*pkt)->stream_index == aidx) {
-      acount++;
     }
   }
 
@@ -165,6 +175,5 @@ export coro play(const char *filename) {
   // avcodec_send_packet(*adec_ctx, nullptr);
   // then send/read
 
-  silog::log(silog::info, "Movie ended V[%s/%d] A[%s/%d]", vdec->name, vcount,
-             adec->name, acount);
+  silog::log(silog::info, "Movie ended");
 }
