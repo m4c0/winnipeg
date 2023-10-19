@@ -6,6 +6,7 @@ import ffmpeg;
 import hai;
 import silog;
 import sith;
+import sitime;
 import vee;
 
 static constexpr const auto input_filename = "input.mkv";
@@ -42,6 +43,7 @@ public:
 class movie {
   player m_player;
   coro m_coro;
+  sitime::stopwatch m_watch{};
 
   vee::extent m_ext;
 
@@ -88,6 +90,12 @@ public:
     auto frm = m_coro();
     if (!m_coro)
       return;
+
+    auto pts = static_cast<int>(m_player.timestamp() * 1000.0);
+    auto mts = m_watch.millis();
+    if (pts > mts) {
+      sitime::sleep_ms(pts - mts);
+    }
 
     // TODO: assert 4:2:0
     // TODO: assert linesize > ext.w
