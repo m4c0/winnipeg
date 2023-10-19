@@ -23,13 +23,32 @@ struct upc {
   float time;
 };
 
+class plane_buf {
+  vee::buffer m_buf;
+  vee::device_memory m_mem;
+
+public:
+  plane_buf() = default;
+  plane_buf(vee::physical_device pd, int sz) {
+    m_buf = vee::create_transfer_src_buffer(sz);
+    m_mem = vee::create_host_buffer_memory(pd, *m_buf);
+    vee::bind_buffer_memory(*m_buf, *m_mem);
+  }
+
+  [[nodiscard]] auto operator*() { return *m_buf; }
+  [[nodiscard]] auto map() { return vee::mapmem(*m_mem); }
+};
+
 class movie {
   coro m_coro;
 
   vee::extent m_ext;
 
-  vee::buffer m_sbuf;
-  vee::device_memory m_smem;
+  vee::sampler_ycbcr_conversion m_smp_conv;
+
+  plane_buf m_buf_y;
+  plane_buf m_buf_u;
+  plane_buf m_buf_v;
 
   vee::image m_img;
   vee::device_memory m_mem;
@@ -40,20 +59,23 @@ public:
     auto [w, h] = m_coro.size();
     m_ext = {static_cast<unsigned>(w), static_cast<unsigned>(h)};
 
-    m_sbuf = vee::create_transfer_src_buffer(w * h * 4);
-    m_smem = vee::create_host_buffer_memory(pd, *m_sbuf);
-    vee::bind_buffer_memory(*m_sbuf, *m_smem);
+    m_smp_conv = vee::create_sampler_yuv420p_conversion(pd);
 
-    m_img = vee::create_srgba_image(m_ext);
+    m_buf_y = plane_buf{pd, w * h};
+    m_buf_u = plane_buf{pd, w * h / 4};
+    m_buf_v = plane_buf{pd, w * h / 4};
+
+    m_img = vee::create_yuv420p_image(m_ext);
     m_mem = vee::create_local_image_memory(pd, *m_img);
     vee::bind_image_memory(*m_img, *m_mem);
-    m_iv = vee::create_srgba_image_view(*m_img);
+    m_iv = vee::create_yuv420p_image_view(*m_img, *m_smp_conv);
 
     if (m_coro.failed())
       return;
     silog::log(silog::info, "Video size: %dx%d", m_ext.width, m_ext.height);
   }
 
+  [[nodiscard]] auto conv() const noexcept { return *m_smp_conv; }
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
 
   void fetch_frame() {
@@ -64,25 +86,25 @@ public:
     if (!m_coro)
       return;
 
-    struct yuv {
-      unsigned char y;
-      unsigned char u;
-      unsigned char v;
-      unsigned char pad;
-    };
-
-    vee::mapmem m{*m_smem};
-    auto *c = static_cast<yuv *>(*m);
     // TODO: assert 4:2:0
     // TODO: assert linesize > ext.w
+
+    auto y = m_buf_y.map();
+    auto *yy = static_cast<unsigned char *>(*y);
     for (auto y = 0; y < m_ext.height; y++) {
-      auto y2 = y / 2;
       for (auto x = 0; x < m_ext.width; x++) {
-        auto x2 = x / 2;
-        auto &cc = c[y * m_ext.width + x];
-        cc.y = frm->data[0][y * frm->linesize[0] + x];
-        cc.u = frm->data[1][y2 * frm->linesize[1] + x2];
-        cc.v = frm->data[2][y2 * frm->linesize[2] + x2];
+        *yy++ = frm->data[0][y * frm->linesize[0] + x];
+      }
+    }
+
+    auto u = m_buf_u.map();
+    auto *uu = static_cast<unsigned char *>(*u);
+    auto v = m_buf_v.map();
+    auto *vv = static_cast<unsigned char *>(*v);
+    for (auto y = 0; y < m_ext.height / 2; y++) {
+      for (auto x = 0; x < m_ext.width / 2; x++) {
+        *uu++ = frm->data[1][y * frm->linesize[1] + x];
+        *vv++ = frm->data[2][y * frm->linesize[2] + x];
       }
     }
   }
@@ -92,7 +114,8 @@ public:
       return;
 
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);
-    vee::cmd_copy_buffer_to_image(cb, m_ext, *m_sbuf, *m_img);
+    vee::cmd_copy_yuv420p_buffers_to_image(cb, m_ext, *m_buf_y, *m_buf_u,
+                                           *m_buf_v, *m_img);
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_transfer_to_fragment);
   }
 };
@@ -135,18 +158,18 @@ void thread::run() {
   vee::command_pool cp = vee::create_command_pool(qf);
   vee::command_buffer cb = vee::allocate_primary_command_buffer(*cp);
 
+  movie mov{pd};
+
   // Descriptor set layout + pool
+  vee::sampler smp = vee::create_yuv_sampler(vee::linear_sampler, mov.conv());
   vee::descriptor_set_layout dsl =
-      vee::create_descriptor_set_layout({vee::dsl_fragment_sampler()});
+      vee::create_descriptor_set_layout({vee::dsl_fragment_samplers({*smp})});
 
   vee::descriptor_pool dp =
       vee::create_descriptor_pool(1, {vee::combined_image_sampler(1)});
   vee::descriptor_set dset = vee::allocate_descriptor_set(*dp, *dsl);
 
-  vee::sampler smp = vee::create_sampler(vee::linear_sampler);
-
-  movie mov{pd};
-  vee::update_descriptor_set(dset, 0, mov.iv(), *smp);
+  vee::update_descriptor_set(dset, 0, mov.iv());
 
   while (!interrupted()) {
     // Generic pipeline stuff
