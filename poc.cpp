@@ -42,7 +42,7 @@ public:
 
 class movie {
   player m_player;
-  coro m_coro;
+  player_promise::coro m_coro;
   sitime::stopwatch m_watch{};
 
   vee::extent m_ext;
@@ -75,7 +75,7 @@ public:
     vee::bind_image_memory(*m_img, *m_mem);
     m_iv = vee::create_yuv420p_image_view(*m_img, *m_smp_conv);
 
-    if (m_coro.failed())
+    if (m_coro.promise().failed)
       return;
     silog::log(silog::info, "Video size: %dx%d", m_ext.width, m_ext.height);
   }
@@ -84,16 +84,19 @@ public:
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
 
   void fetch_frame() {
-    if (!m_coro)
+    if (m_coro.done() || m_coro.promise().failed)
       return;
 
-    auto frm = m_coro();
-    if (!m_coro)
+    m_coro.resume();
+    if (m_coro.done() || m_coro.promise().failed)
       return;
+
+    auto frm = m_coro.promise().value;
 
     auto pts = static_cast<int>(m_player.timestamp() * 1000.0);
     auto mts = m_watch.millis();
     if (pts > mts) {
+      // TODO: fix after seeking
       sitime::sleep_ms(pts - mts);
     }
 
@@ -121,7 +124,7 @@ public:
   }
 
   void run(vee::command_buffer cb) {
-    if (!m_coro)
+    if (m_coro.done() || m_coro.promise().failed)
       return;
 
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);

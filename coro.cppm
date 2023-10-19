@@ -44,3 +44,18 @@ struct suspend_never {
   constexpr void await_resume() const noexcept {}
 };
 } // namespace std
+
+export template <typename P> class coro {
+  std::coroutine_handle<P> m_handle;
+
+public:
+  using handle_type = std::coroutine_handle<P>;
+  using promise_type = P;
+
+  coro(std::coroutine_handle<P> h) : m_handle{h} {}
+  ~coro() { m_handle.destroy(); }
+
+  [[nodiscard]] auto done() const noexcept { return m_handle.done(); }
+  [[nodiscard]] auto resume() const noexcept { return m_handle.resume(); }
+  [[nodiscard]] auto promise() const noexcept { return m_handle.promise(); }
+};

@@ -37,34 +37,20 @@ inline int assert_p(int i, const char *msg) {
   return i;
 }
 
-export struct coro {
-  struct promise_type;
-  using handle_t = std::coroutine_handle<promise_type>;
+export struct player_promise {
+  using coro = ::coro<player_promise>;
 
-  struct promise_type {
-    AVFrame *value;
-    bool failed;
+  AVFrame *value;
+  bool failed;
 
-    coro get_return_object() { return {handle_t::from_promise(*this)}; }
-    std::suspend_never initial_suspend() { return {}; }
-    std::suspend_always final_suspend() noexcept { return {}; }
-    std::suspend_always yield_value(AVFrame *v) {
-      value = v;
-      return {};
-    }
-    void unhandled_exception() { failed = true; }
-  };
-
-  handle_t h;
-
-  auto failed() const noexcept { return h.promise().failed; }
-
-  explicit operator bool() const noexcept { return !h.done() && !failed(); }
-  auto operator()() {
-    h.resume();
-    return h.promise().value;
+  coro get_return_object() { return {coro::handle_type::from_promise(*this)}; }
+  std::suspend_never initial_suspend() { return {}; }
+  std::suspend_always final_suspend() noexcept { return {}; }
+  std::suspend_always yield_value(AVFrame *v) {
+    value = v;
+    return {};
   }
-  ~coro() { h.destroy(); }
+  void unhandled_exception() { failed = true; }
 };
 export class player {
   hai::holder<AVFormatContext, deleter> fmt_ctx{};
@@ -94,7 +80,7 @@ public:
     return t * av_q2d(tb);
   }
 
-  coro play();
+  player_promise::coro play();
 };
 
 player::player(const char *filename) {
@@ -141,7 +127,7 @@ player::player(const char *filename) {
   av_dump_format(*fmt_ctx, 0, filename, 0);
 }
 
-coro player::play() {
+player_promise::coro player::play() {
   hai::holder<AVPacket, deleter> pkt{av_packet_alloc()};
 
   while (av_read_frame(*fmt_ctx, *pkt) >= 0) {
