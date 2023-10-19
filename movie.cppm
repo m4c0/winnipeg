@@ -65,7 +65,7 @@ public:
   [[nodiscard]] auto conv() const noexcept { return *m_smp_conv; }
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
 
-  void fetch_frame() {
+  void run(vee::command_buffer cb) {
     if (m_coro.done() || m_coro.promise().failed)
       return;
 
@@ -103,11 +103,6 @@ public:
         *vv++ = frm->data[2][y * frm->linesize[2] + x];
       }
     }
-  }
-
-  void run(vee::command_buffer cb) {
-    if (m_coro.done() || m_coro.promise().failed)
-      return;
 
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);
     vee::cmd_copy_yuv420p_buffers_to_image(cb, m_ext, *m_buf_y, *m_buf_u,

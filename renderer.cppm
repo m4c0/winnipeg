@@ -145,7 +145,6 @@ void thread::run() {
       vee::wait_and_reset_fence(*f);
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
-      mov.fetch_frame();
       // TODO: update pc.time
 
       pc = {
