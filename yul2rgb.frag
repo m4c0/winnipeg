@@ -12,6 +12,7 @@ void main() {
   vec2 uv = p * 0.5 + 0.5;
 
   vec3 rgb = texture(movie, uv).rgb;
+  rgb = pow(rgb, vec3(2.2));
 
   frag_colour = vec4(rgb, 1);
 }
