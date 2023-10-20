@@ -1,6 +1,6 @@
 export module renderer;
-#pragma leco add_shader "quad.vert"
-#pragma leco add_shader "yul2rgb.frag"
+#pragma leco add_shader "winnipeg.vert"
+#pragma leco add_shader "winnipeg.frag"
 import casein;
 import hai;
 import movie;
