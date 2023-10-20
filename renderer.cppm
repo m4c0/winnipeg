@@ -21,18 +21,21 @@ struct upc {
   float time;
 };
 
-class thread : public sith::thread {
+class thread : sith::thread, public casein::handler {
   casein::native_handle_t m_nptr;
   volatile bool m_resized;
 
 public:
-  void start(casein::native_handle_t n) {
-    m_nptr = n;
-    sith::thread::start();
-  }
-  void resize() { m_resized = true; }
-
   void run() override;
+
+  void create_window(const casein::events::create_window &e) override {
+    m_nptr = *e;
+    start();
+  }
+  void resize_window(const casein::events::resize_window &e) override {
+    m_resized = true;
+  }
+  void quit(const casein::events::quit &e) override {}
 };
 
 void thread::run() {
@@ -190,16 +193,5 @@ void thread::run() {
 
 extern "C" void casein_handle(const casein::event &e) {
   static thread t{};
-
-  static constexpr auto map = [] {
-    casein::event_map res{};
-    res[casein::CREATE_WINDOW] = [](const casein::event &e) {
-      t.start(*e.as<casein::events::create_window>());
-    };
-    res[casein::RESIZE_WINDOW] = [](auto) { t.resize(); };
-    res[casein::QUIT] = [](auto) { t.stop(); };
-    return res;
-  }();
-
-  map.handle(e);
+  t.handle(e);
 }
