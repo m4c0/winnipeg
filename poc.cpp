@@ -1,7 +1,6 @@
 #pragma leco app
 import thread;
 
-// TODO: audio
 // TODO: seek
 // TODO: scripting
 // TODO: better naming

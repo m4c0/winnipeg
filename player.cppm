@@ -14,6 +14,7 @@ extern "C" {
 export module player;
 import coro;
 import hai;
+import siaudio;
 import silog;
 
 struct deleter {
@@ -37,6 +38,30 @@ inline int assert_p(int i, const char *msg) {
   return i;
 }
 
+class audio : public siaudio::os_streamer {
+  static constexpr const auto buf_len = 441000;
+  hai::array<float> m_cbuf{buf_len};
+  volatile unsigned m_rp = 0;
+  volatile unsigned m_wp = 0;
+
+public:
+  void fill_buffer(float *f, unsigned num_samples) override {
+    while (num_samples > 0 && m_rp != m_wp) {
+      *f++ = m_cbuf[m_rp];
+      m_rp = (m_rp + 1) % buf_len;
+      num_samples--;
+    }
+  }
+
+  void push_frame(float *f, unsigned num_samples) {
+    while (num_samples > 0 && m_rp != m_wp + 1) {
+      m_cbuf[m_wp] = *f++;
+      m_wp = (m_wp + 1) % buf_len;
+      num_samples--;
+    }
+  }
+};
+
 export struct player_promise {
   using coro = ::coro<player_promise>;
 
@@ -57,6 +82,7 @@ export class player {
   hai::holder<AVCodecContext, deleter> vdec_ctx{};
   hai::holder<AVCodecContext, deleter> adec_ctx{};
   hai::holder<AVFrame, deleter> frm{av_frame_alloc()};
+  audio m_audio;
   int aidx;
   int vidx;
 
@@ -139,7 +165,7 @@ player_promise::coro player::play() {
     // size (e.g. MPEG audio), then it contains one frame."
     if ((*pkt)->stream_index == vidx) {
       assert_p(avcodec_send_packet(*vdec_ctx, *pkt),
-               "Error sending packet to decode");
+               "Error sending video packet to decode");
       while (true) {
         auto res = avcodec_receive_frame(*vdec_ctx, *frm);
         if (res >= 0) {
@@ -153,6 +179,25 @@ player_promise::coro player::play() {
         assert_p(res, "Error decoding video frame");
       }
     } else if ((*pkt)->stream_index == aidx) {
+      assert_p(avcodec_send_packet(*adec_ctx, *pkt),
+               "Error sending audio packet to decode");
+      while (true) {
+        auto res = avcodec_receive_frame(*adec_ctx, *frm);
+        if (res >= 0) {
+          hai::holder<AVFrame, unref> fref{*frm};
+
+          auto fmt = static_cast<AVSampleFormat>((*frm)->format);
+          assert(fmt == AV_SAMPLE_FMT_FLTP, "only float planar so far");
+
+          // output audio frame
+          auto *data = reinterpret_cast<float *>((*frm)->extended_data[0]);
+          m_audio.push_frame(data, (*frm)->nb_samples);
+          continue;
+        }
+        if (res == AVERROR_EOF || AVERROR(EAGAIN))
+          break;
+        assert_p(res, "Error decoding audio frame");
+      }
     }
   }
 
