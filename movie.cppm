@@ -1,5 +1,5 @@
 export module movie;
-import ffmpeg;
+import player;
 import silog;
 import sitime;
 import vee;

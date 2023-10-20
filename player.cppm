@@ -11,7 +11,7 @@ extern "C" {
 #include <libavutil/timestamp.h>
 }
 
-export module ffmpeg;
+export module player;
 import coro;
 import hai;
 import silog;
