@@ -1,5 +1,5 @@
 #pragma leco app
-import renderer;
+import thread;
 
 // TODO: audio
 // TODO: seek

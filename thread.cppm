@@ -1,4 +1,4 @@
-export module renderer;
+export module thread;
 #pragma leco add_shader "winnipeg.vert"
 #pragma leco add_shader "winnipeg.frag"
 import casein;
