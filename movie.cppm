@@ -62,6 +62,13 @@ public:
     silog::log(silog::info, "Video size: %dx%d", m_ext.width, m_ext.height);
   }
 
+  void seek(double ts) {
+    m_player.stop();
+    m_player.seek(ts);
+    m_coro.resume();
+    silog::assert(m_coro.promise().value == nullptr, "Null frame after seek");
+  }
+
   [[nodiscard]] auto conv() const noexcept { return *m_smp_conv; }
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
 
