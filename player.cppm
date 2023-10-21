@@ -78,6 +78,9 @@ public:
     auto vtb = static_cast<int>(timestamp * static_cast<double>(AV_TIME_BASE));
     assert_p(avformat_seek_file(*fmt_ctx, -1, INT64_MIN, vtb, INT64_MAX, 0),
              "Failed to seek");
+    m_audio.stop();
+    m_audio.flush();
+    m_audio.start();
   }
   void stop() { m_stop = true; }
 
