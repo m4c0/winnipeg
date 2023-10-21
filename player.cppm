@@ -79,15 +79,9 @@ public:
   explicit player(const char *filename);
 
   void seek(double timestamp) {
-    auto vst = (*fmt_ctx)->streams[vidx];
-    auto vtb = static_cast<int>(timestamp / av_q2d(vst->time_base));
-    assert_p(avformat_seek_file(*fmt_ctx, vidx, vtb - 1, vtb, vtb + 1, 0),
-             "Failed to seek video");
-
-    auto ast = (*fmt_ctx)->streams[aidx];
-    auto atb = static_cast<int>(timestamp / av_q2d(ast->time_base));
-    assert_p(avformat_seek_file(*fmt_ctx, aidx, atb - 1, atb, atb + 1, 0),
-             "Failed to seek audio");
+    auto vtb = static_cast<int>(timestamp / static_cast<double>(AV_TIME_BASE));
+    assert_p(avformat_seek_file(*fmt_ctx, -1, INT64_MIN, vtb, vtb, 0),
+             "Failed to seek");
   }
 
   auto width() { return (*vdec_ctx)->width; }
