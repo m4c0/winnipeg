@@ -65,6 +65,28 @@ export class player {
   int aidx;
   int vidx;
 
+  void flush() {
+    avcodec_send_packet(*vdec_ctx, nullptr);
+    avcodec_send_packet(*adec_ctx, nullptr);
+
+    hai::holder<AVPacket, deleter> pkt{av_packet_alloc()};
+    while (av_read_frame(*fmt_ctx, *pkt) >= 0) {
+      hai::holder<AVPacket, unref> pref{*pkt};
+      if ((*pkt)->stream_index == vidx) {
+        assert_p(avcodec_send_packet(*vdec_ctx, *pkt),
+                 "Error sending video flush to decode");
+        while (avcodec_receive_frame(*vdec_ctx, *frm) >= 0) {
+        }
+      }
+      if ((*pkt)->stream_index == aidx) {
+        assert_p(avcodec_send_packet(*adec_ctx, *pkt),
+                 "Error sending audio flush to decode");
+        while (avcodec_receive_frame(*adec_ctx, *frm) >= 0) {
+        }
+      }
+    }
+  }
+
 public:
   explicit player(const char *filename);
 
@@ -185,10 +207,7 @@ player_promise::coro player::play() {
     }
   }
 
-  // TODO: flush decoders
-  // avcodec_send_packet(*vdec_ctx, nullptr);
-  // avcodec_send_packet(*adec_ctx, nullptr);
-  // then send/read
+  flush();
 
   silog::log(silog::info, "Movie ended");
 }
