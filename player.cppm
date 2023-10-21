@@ -70,9 +70,14 @@ public:
 
   void seek(double timestamp) {
     auto vst = (*fmt_ctx)->streams[vidx];
-    auto tb = static_cast<int>(timestamp / av_q2d(vst->time_base));
-    assert_p(avformat_seek_file(*fmt_ctx, vidx, tb - 1, tb, tb + 1, 0),
-             "Failed to seek");
+    auto vtb = static_cast<int>(timestamp / av_q2d(vst->time_base));
+    assert_p(avformat_seek_file(*fmt_ctx, vidx, vtb - 1, vtb, vtb + 1, 0),
+             "Failed to seek video");
+
+    auto ast = (*fmt_ctx)->streams[aidx];
+    auto atb = static_cast<int>(timestamp / av_q2d(ast->time_base));
+    assert_p(avformat_seek_file(*fmt_ctx, aidx, atb - 1, atb, atb + 1, 0),
+             "Failed to seek audio");
   }
 
   auto width() { return (*vdec_ctx)->width; }
