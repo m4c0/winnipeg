@@ -51,7 +51,10 @@ export struct player_promise {
     value = v;
     return {};
   }
-  void unhandled_exception() { failed = true; }
+  void unhandled_exception() {
+    silog::log(silog::error, "uncaptured exception in player");
+    failed = true;
+  }
 };
 export class player {
   hai::holder<AVFormatContext, deleter> fmt_ctx{};
