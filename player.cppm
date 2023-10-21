@@ -67,13 +67,8 @@ export class player {
   bool m_stop;
 
   void flush() {
-    avcodec_send_packet(*vdec_ctx, nullptr);
-    while (avcodec_receive_frame(*vdec_ctx, *frm) >= 0) {
-    }
-
-    avcodec_send_packet(*adec_ctx, nullptr);
-    while (avcodec_receive_frame(*adec_ctx, *frm) >= 0) {
-    }
+    avcodec_flush_buffers(*vdec_ctx);
+    avcodec_flush_buffers(*adec_ctx);
   }
 
 public:
