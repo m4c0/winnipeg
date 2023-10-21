@@ -26,6 +26,7 @@ export class movie {
   player m_player;
   player_promise::coro m_coro;
   sitime::stopwatch m_watch{};
+  unsigned m_seek{};
 
   vee::extent m_ext;
 
@@ -62,7 +63,10 @@ public:
     silog::log(silog::info, "Video size: %dx%d", m_ext.width, m_ext.height);
   }
 
-  void seek(double ts) { m_player.seek(ts); }
+  void seek(double ts) {
+    m_player.seek(ts);
+    m_seek = static_cast<int>(ts * 1000.0);
+  }
 
   [[nodiscard]] auto conv() const noexcept { return *m_smp_conv; }
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
@@ -78,10 +82,10 @@ public:
     auto frm = m_coro.promise().value;
 
     auto pts = static_cast<int>(m_player.timestamp() * 1000.0);
-    auto mts = m_watch.millis();
+    auto mts = m_watch.millis() + m_seek;
     if (pts > mts) {
       // TODO: fix after seeking
-      // sitime::sleep_ms(pts - mts);
+      sitime::sleep_ms(pts - mts);
     }
 
     // TODO: assert 4:2:0
