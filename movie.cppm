@@ -66,6 +66,7 @@ public:
   void seek(double ts) {
     m_player.seek(ts);
     m_seek = static_cast<int>(ts * 1000.0);
+    m_watch = {};
   }
 
   [[nodiscard]] auto conv() const noexcept { return *m_smp_conv; }
