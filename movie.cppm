@@ -71,6 +71,8 @@ public:
   [[nodiscard]] auto conv() const noexcept { return *m_smp_conv; }
   [[nodiscard]] auto iv() const noexcept { return *m_iv; }
 
+  [[nodiscard]] auto timestamp() const noexcept { return m_player.timestamp(); }
+
   void run(vee::command_buffer cb) {
     if (m_coro.done() || m_coro.promise().failed)
       return;

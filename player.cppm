@@ -84,7 +84,7 @@ public:
   auto width() { return (*vdec_ctx)->width; }
   auto height() { return (*vdec_ctx)->height; }
 
-  auto timestamp() {
+  auto timestamp() const noexcept {
     auto vst = (*fmt_ctx)->streams[vidx];
     auto t = static_cast<double>((*frm)->pts);
     auto tb = vst->time_base;
