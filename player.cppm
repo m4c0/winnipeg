@@ -75,8 +75,8 @@ public:
   explicit player(const char *filename);
 
   void seek(double timestamp) {
-    auto vtb = static_cast<int>(timestamp / static_cast<double>(AV_TIME_BASE));
-    assert_p(avformat_seek_file(*fmt_ctx, -1, INT64_MIN, vtb, vtb, 0),
+    auto vtb = static_cast<int>(timestamp * static_cast<double>(AV_TIME_BASE));
+    assert_p(avformat_seek_file(*fmt_ctx, -1, INT64_MIN, vtb, INT64_MAX, 0),
              "Failed to seek");
   }
   void stop() { m_stop = true; }
