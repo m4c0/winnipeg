@@ -2,6 +2,7 @@ export module thread;
 #pragma leco add_shader "winnipeg.vert"
 #pragma leco add_shader "winnipeg.frag"
 import casein;
+import coro;
 import hai;
 import movie;
 import silog;
@@ -21,11 +22,34 @@ struct upc {
   float time;
 };
 
-class thread : sith::thread, public casein::handler {
+export struct step {
+  // fx parameters, etc
+};
+
+export struct step_promise {
+  using coro = ::coro<step_promise>;
+
+  step value;
+
+  coro get_return_object() { return coro::from_promise(*this); }
+  std::suspend_never initial_suspend() { return {}; }
+  std::suspend_always final_suspend() noexcept { return {}; }
+  std::suspend_always yield_value(step &&s) {
+    value = s;
+    return {};
+  }
+  void unhandled_exception() {}
+};
+
+using script = coro<step_promise> (*)(movie *);
+export class thread : sith::thread, public casein::handler {
+  script m_script;
   casein::native_handle_t m_nptr;
   volatile bool m_resized;
 
 public:
+  explicit thread(script s) : m_script(s) {}
+
   void run() override;
 
   void create_window(const casein::events::create_window &e) override {
@@ -66,6 +90,7 @@ void thread::run() {
   vee::command_buffer cb = vee::allocate_primary_command_buffer(*cp);
 
   movie mov{pd};
+  auto scr = m_script(&mov);
 
   // Descriptor set layout + pool
   vee::sampler smp = vee::create_yuv_sampler(vee::linear_sampler, mov.conv());
@@ -78,7 +103,7 @@ void thread::run() {
 
   vee::update_descriptor_set(dset, 0, mov.iv());
 
-  while (!interrupted()) {
+  while (!interrupted() && !scr.done()) {
     // Generic pipeline stuff
     vee::shader_module vert =
         vee::create_shader_module_from_resource("quad.vert.spv");
@@ -147,7 +172,7 @@ void thread::run() {
     };
 
     m_resized = false;
-    while (!interrupted() && !m_resized) {
+    while (!interrupted() && !m_resized && !scr.done()) {
       vee::wait_and_reset_fence(*f);
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
@@ -160,6 +185,7 @@ void thread::run() {
 
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
+      scr.resume();
       mov.run(cb);
       vee::cmd_begin_render_pass({
           .command_buffer = cb,
@@ -192,9 +218,4 @@ void thread::run() {
 
     vee::device_wait_idle();
   }
-}
-
-extern "C" void casein_handle(const casein::event &e) {
-  static thread t{};
-  t.handle(e);
 }
