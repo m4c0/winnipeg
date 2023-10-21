@@ -64,6 +64,7 @@ export class player {
   audio m_audio;
   int aidx;
   int vidx;
+  bool m_stop;
 
   void flush() {
     avcodec_send_packet(*vdec_ctx, nullptr);
@@ -83,6 +84,7 @@ public:
     assert_p(avformat_seek_file(*fmt_ctx, -1, INT64_MIN, vtb, vtb, 0),
              "Failed to seek");
   }
+  void stop() { m_stop = true; }
 
   auto width() { return (*vdec_ctx)->width; }
   auto height() { return (*vdec_ctx)->height; }
@@ -154,7 +156,7 @@ player_promise::coro player::play() {
     if ((*pkt)->stream_index == vidx) {
       assert_p(avcodec_send_packet(*vdec_ctx, *pkt),
                "Error sending video packet to decode");
-      while (true) {
+      while (!m_stop) {
         auto res = avcodec_receive_frame(*vdec_ctx, *frm);
         if (res >= 0) {
           hai::holder<AVFrame, unref> fref{*frm};
@@ -169,7 +171,7 @@ player_promise::coro player::play() {
     } else if ((*pkt)->stream_index == aidx) {
       assert_p(avcodec_send_packet(*adec_ctx, *pkt),
                "Error sending audio packet to decode");
-      while (true) {
+      while (!m_stop) {
         auto res = avcodec_receive_frame(*adec_ctx, *frm);
         if (res >= 0) {
           hai::holder<AVFrame, unref> fref{*frm};
@@ -187,9 +189,13 @@ player_promise::coro player::play() {
         assert_p(res, "Error decoding audio frame");
       }
     }
+
+    if (m_stop) {
+      m_stop = false;
+      co_yield nullptr;
+    }
   }
 
   flush();
-
   silog::log(silog::info, "Movie ended");
 }
