@@ -60,6 +60,13 @@ public:
       num_samples--;
     }
   }
+
+  void flush() {
+    m_rp = 0;
+    m_wp = 0;
+    for (auto &f : m_cbuf)
+      f = 0;
+  }
 };
 
 export struct player_promise {
