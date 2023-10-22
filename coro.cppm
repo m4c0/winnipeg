@@ -6,14 +6,17 @@ template <typename Tp, typename...> struct coroutine_traits {
 };
 template <typename Tp = void> class coroutine_handle;
 template <> class coroutine_handle<> {
-  void *addr;
+  void *addr{};
 
   template <typename> friend class coroutine_handle;
 
   constexpr coroutine_handle(void *addr) : addr{addr} {}
 
 public:
+  constexpr coroutine_handle() = default;
   static constexpr coroutine_handle from_address(void *addr) { return {addr}; };
+
+  explicit operator bool() const noexcept { return addr != nullptr; }
 
   bool done() const { return __builtin_coro_done(addr); }
   void destroy() const { return __builtin_coro_destroy(addr); }
