@@ -5,6 +5,7 @@ import casein;
 import coro;
 import hai;
 import movie;
+import script;
 import silog;
 import sith;
 import vee;
@@ -26,29 +27,14 @@ export struct step {
   // fx parameters, etc
 };
 
-export struct step_promise {
-  using coro = ::coro<step_promise>;
-
-  step value;
-
-  coro get_return_object() { return coro::from_promise(*this); }
-  std::suspend_never initial_suspend() { return {}; }
-  std::suspend_always final_suspend() noexcept { return {}; }
-  std::suspend_always yield_value(step &&s) {
-    value = s;
-    return {};
-  }
-  void unhandled_exception() {}
-};
-
-using script = coro<step_promise> (*)(movie *);
+using script_t = script::task<step> (*)(movie *);
 export class thread : sith::thread, public casein::handler {
-  script m_script;
+  script_t m_script;
   casein::native_handle_t m_nptr;
   volatile bool m_resized;
 
 public:
-  explicit thread(script s) : m_script(s) {}
+  explicit thread(script_t s) : m_script(s) {}
 
   void run() override;
 
@@ -185,7 +171,7 @@ void thread::run() {
 
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
-      scr.resume();
+      [[maybe_unused]] step s = scr.next();
       mov.run(cb);
       vee::cmd_begin_render_pass({
           .command_buffer = cb,
