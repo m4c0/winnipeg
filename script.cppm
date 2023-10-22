@@ -11,7 +11,7 @@ export template <typename Tp> class task {
   bool empty;
 
   bool advance(corohpt who) {
-    auto next = who.promise().next();
+    auto next = who.promise().next;
     if (!next || next.done() || advance(next)) {
       who.resume();
       return who.done();
@@ -52,7 +52,7 @@ public:
     empty = true;
 
     auto who = h;
-    while (auto next = who.promise().next()) {
+    while (auto next = who.promise().next) {
       if (next.done()) {
         break;
       }
@@ -78,7 +78,7 @@ template <typename Tp> struct promise_type {
   }
   std::suspend_always initial_suspend() { return {}; }
   std::suspend_always final_suspend() noexcept { return {}; }
-  std::suspend_always yield_value(int i) {
+  std::suspend_always yield_value(Tp i) {
     value = i;
     return {};
   }
