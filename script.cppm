@@ -2,17 +2,16 @@ export module script;
 import coro;
 
 namespace script {
-struct promise_type;
-using corohpt = std::coroutine_handle<promise_type>;
-void set_next(corohpt, corohpt);
-corohpt get_next(corohpt);
-int get_value(corohpt);
-export class task {
+template <typename Tp> struct promise_type;
+
+export template <typename Tp> class task {
+  using corohpt = std::coroutine_handle<promise_type<Tp>>;
+
   corohpt h;
   bool empty;
 
   bool advance(corohpt who) {
-    auto next = get_next(who);
+    auto next = who.promise().next();
     if (!next || next.done() || advance(next)) {
       who.resume();
       return who.done();
@@ -21,17 +20,14 @@ export class task {
   }
 
 public:
-  task(corohpt h) : h{h} {
-    // printf("%p ctor %p\n", this, &h.promise());
-  }
+  using promise_type = script::promise_type<Tp>;
+
+  task(corohpt h) : h{h} {}
   task(task &&t) = delete;
   task(const task &t) = delete;
   task &operator=(task &&t) = delete;
   task &operator=(const task &t) = delete;
-  ~task() {
-    // printf("%p dtor %p\n", this, &h.promise());
-    h.destroy();
-  }
+  ~task() { h.destroy(); }
 
   auto operator co_await() {
     struct awaiter {
@@ -39,15 +35,11 @@ public:
 
       bool await_ready() { return false; }
       auto await_suspend(corohpt h) {
-        // printf("sus %p %p\n", &h.promise(), &self.promise());
-        set_next(h, self);
+        h.promise().next = self;
         return self;
       }
-      void await_resume() {
-        // printf("res %p\n", &self.promise());
-      }
+      void await_resume() {}
     };
-    // printf("%p await %p\n", this, &h.promise());
     return awaiter{h};
   }
 
@@ -55,19 +47,19 @@ public:
     fill();
     return h.done();
   }
-  int next() {
+  Tp next() {
     fill();
     empty = true;
 
     auto who = h;
-    while (auto next = get_next(who)) {
+    while (auto next = who.promise().next()) {
       if (next.done()) {
         break;
       }
       who = next;
     }
 
-    return get_value(who);
+    return who.promise().value;
   }
 
   void fill() {
@@ -76,14 +68,12 @@ public:
     advance(h);
     empty = false;
   }
-
-  using promise_type = script::promise_type;
 };
-struct promise_type {
-  std::coroutine_handle<promise_type> next{};
-  int value = -1;
+template <typename Tp> struct promise_type {
+  std::coroutine_handle<promise_type<Tp>> next{};
+  Tp value{};
 
-  task get_return_object() {
+  task<Tp> get_return_object() {
     return {std::coroutine_handle<promise_type>::from_promise(*this)};
   }
   std::suspend_always initial_suspend() { return {}; }
@@ -95,7 +85,4 @@ struct promise_type {
   void return_void() {}
   void unhandled_exception() {}
 };
-corohpt get_next(corohpt h) { return h.promise().next; }
-void set_next(corohpt a, corohpt b) { a.promise().next = b; }
-int get_value(corohpt h) { return h.promise().value; }
 } // namespace script
