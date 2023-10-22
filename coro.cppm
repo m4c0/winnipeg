@@ -9,13 +9,13 @@ template <typename Tp = void> class coroutine_handle;
 template <> class coroutine_handle<void> {
   void *addr{};
 
-  template <typename> friend class coroutine_handle;
-
-  constexpr coroutine_handle(void *addr) : addr{addr} {}
-
 public:
   constexpr coroutine_handle() = default;
-  static constexpr coroutine_handle from_address(void *addr) { return {addr}; };
+  static constexpr coroutine_handle from_address(void *addr) {
+    coroutine_handle res{};
+    res.addr = addr;
+    return res;
+  };
 
   explicit operator bool() const noexcept { return addr != nullptr; }
 
@@ -40,19 +40,25 @@ struct suspend_never {
 template <typename Tp> class coroutine_handle {
   void *addr{};
 
-  // template <typename> friend class coroutine_handle;
-
-  constexpr coroutine_handle(void *addr) : addr{addr} {}
-
 public:
   constexpr coroutine_handle() = default;
 
-  static constexpr coroutine_handle from_address(void *addr) { return {addr}; };
+  static constexpr coroutine_handle from_address(void *addr) {
+    coroutine_handle res{};
+    res.addr = addr;
+    return res;
+  };
   static constexpr coroutine_handle from_promise(Tp &p) {
-    return {__builtin_coro_promise(&p, alignof(Tp), true)};
+    coroutine_handle res{};
+    res.addr = __builtin_coro_promise(&p, alignof(Tp), true);
+    return res;
   };
 
-  constexpr operator coroutine_handle<>() const noexcept { return {addr}; }
+  constexpr operator coroutine_handle<>() const noexcept {
+    coroutine_handle<> res{};
+    res.addr = addr;
+    return res;
+  }
 
   explicit operator bool() const noexcept { return addr != nullptr; }
 
