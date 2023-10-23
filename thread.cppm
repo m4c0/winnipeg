@@ -84,14 +84,15 @@ void thread::run() {
 
   // Descriptor set layout + pool
   vee::sampler smp = vee::create_yuv_sampler(vee::linear_sampler, mov.conv());
-  vee::descriptor_set_layout dsl =
-      vee::create_descriptor_set_layout({vee::dsl_fragment_samplers({*smp})});
+  vee::descriptor_set_layout dsl = vee::create_descriptor_set_layout(
+      {vee::dsl_fragment_samplers({*smp}), vee::dsl_fragment_sampler()});
 
   vee::descriptor_pool dp =
-      vee::create_descriptor_pool(1, {vee::combined_image_sampler(1)});
+      vee::create_descriptor_pool(1, {vee::combined_image_sampler(2)});
   vee::descriptor_set dset = vee::allocate_descriptor_set(*dp, *dsl);
 
   vee::update_descriptor_set(dset, 0, mov.iv());
+  // vee::update_descriptor_set(dset, 1, nullptr);
 
   while (!interrupted() && !scr.done()) {
     // Generic pipeline stuff

@@ -6,12 +6,18 @@ layout(push_constant) uniform upc {
   float movie_scale;
 } pc;
 layout(set = 0, binding = 0) uniform sampler2D smp_movie;
+layout(set = 0, binding = 1) uniform sampler2D smp_overlay;
 
 layout(location = 0) in vec2 frag_coord;
 
 layout(location = 0) out vec4 frag_colour;
 
 vec3 movie(vec2 p) {
+  p /= pc.movie_scale;
+
+  float t = pc.movie_angle;
+  p = mat2(cos(t), -sin(t), sin(t), cos(t)) * p;
+
   vec2 uv = p;
   uv = uv / vec2(pc.aspect, 1);
 
@@ -27,14 +33,19 @@ vec3 movie(vec2 p) {
   return rgb;
 }
 
+vec4 overlay(vec2 p) {
+  vec2 uv = p * 0.5 + 0.5;
+  return texture(smp_overlay, uv);
+}
+
 void main() {
   vec2 p = frag_coord * vec2(pc.aspect, 1);
-  p /= pc.movie_scale;
 
-  float t = pc.movie_angle;
-  p = mat2(cos(t), -sin(t), sin(t), cos(t)) * p;
+  vec3 mov = movie(p);
+  vec4 ovl = overlay(p);
 
-  vec3 rgb = movie(p);
+  vec3 rgb;
+  rgb = mix(mov, ovl.rgb, ovl.a);
 
   frag_colour = vec4(rgb, 1);
 }
