@@ -21,6 +21,7 @@ struct quad {
 
 export struct step {
   float movie_angle;
+  float movie_scale{1.0};
 };
 struct upc {
   float aspect;
