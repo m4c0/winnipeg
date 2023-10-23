@@ -84,6 +84,7 @@ public:
 
     auto frm = m_coro.promise().value;
 
+    silog::log(silog::debug, "Movie at: %f", m_player.timestamp());
     auto pts = static_cast<int>(m_player.timestamp() * 1000.0);
     auto mts = m_watch.millis() + m_seek;
     if (pts > mts) {
