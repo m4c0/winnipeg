@@ -1,6 +1,9 @@
 #version 450
 
-layout(push_constant) uniform upc { float aspect; float time; } pc;
+layout(push_constant) uniform upc {
+  float aspect;
+  float movie_angle;
+} pc;
 layout(set = 0, binding = 0) uniform sampler2D smp_movie;
 
 layout(location = 0) in vec2 frag_coord;
@@ -26,7 +29,7 @@ vec3 movie(vec2 p) {
 void main() {
   vec2 p = frag_coord * vec2(pc.aspect, 1);
 
-  float t = 3.14159265358979323;
+  float t = pc.movie_angle;
   p = mat2(cos(t), -sin(t), sin(t), cos(t)) * p;
 
   vec3 rgb = movie(p);

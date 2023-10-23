@@ -18,13 +18,13 @@ struct quad {
       {1.0, 1.0}, {0.0, 0.0}, {0.0, 1.0},
   };
 };
-struct upc {
-  float aspect;
-  float time;
-};
 
 export struct step {
-  // fx parameters, etc
+  float movie_angle;
+};
+struct upc {
+  float aspect;
+  step s;
 };
 
 using script_t = script::task<step> (*)(movie *);
@@ -162,16 +162,14 @@ void thread::run() {
       vee::wait_and_reset_fence(*f);
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
-      // TODO: update pc.time
-
       pc = {
           .aspect =
               static_cast<float>(ext.width) / static_cast<float>(ext.height),
+          .s = scr.next(),
       };
 
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
-      [[maybe_unused]] step s = scr.next();
       mov.run(cb);
       vee::cmd_begin_render_pass({
           .command_buffer = cb,
