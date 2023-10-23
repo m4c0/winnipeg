@@ -65,10 +65,17 @@ export class player {
   int aidx;
   int vidx;
   bool m_stop;
+  double m_start_ts{};
 
   void flush() {
     avcodec_flush_buffers(*vdec_ctx);
     avcodec_flush_buffers(*adec_ctx);
+  }
+  auto timestamp(int idx) const noexcept {
+    auto st = (*fmt_ctx)->streams[idx];
+    auto t = static_cast<double>((*frm)->pts);
+    auto tb = st->time_base;
+    return t * av_q2d(tb);
   }
 
 public:
@@ -76,23 +83,19 @@ public:
 
   void seek(double timestamp) {
     auto vtb = static_cast<int>(timestamp * static_cast<double>(AV_TIME_BASE));
-    assert_p(avformat_seek_file(*fmt_ctx, -1, vtb, vtb, vtb, 0),
+    assert_p(avformat_seek_file(*fmt_ctx, -1, INT64_MIN, vtb, vtb, 0),
              "Failed to seek");
     m_audio.stop();
     m_audio.flush();
     m_audio.start();
+    m_start_ts = timestamp;
   }
   void stop() { m_stop = true; }
 
   auto width() { return (*vdec_ctx)->width; }
   auto height() { return (*vdec_ctx)->height; }
 
-  auto timestamp() const noexcept {
-    auto vst = (*fmt_ctx)->streams[vidx];
-    auto t = static_cast<double>((*frm)->pts);
-    auto tb = vst->time_base;
-    return t * av_q2d(tb);
-  }
+  auto timestamp() const noexcept { return timestamp(vidx); }
 
   player_promise::coro play();
 };
@@ -156,7 +159,7 @@ player_promise::coro player::play() {
                "Error sending video packet to decode");
       while (!m_stop) {
         auto res = avcodec_receive_frame(*vdec_ctx, *frm);
-        if (res >= 0) {
+        if (res >= 0 && timestamp(vidx) >= m_start_ts) {
           hai::holder<AVFrame, unref> fref{*frm};
           // output video frame
           co_yield *frm;
@@ -166,12 +169,13 @@ player_promise::coro player::play() {
           break;
         assert_p(res, "Error decoding video frame");
       }
+
     } else if ((*pkt)->stream_index == aidx) {
       assert_p(avcodec_send_packet(*adec_ctx, *pkt),
                "Error sending audio packet to decode");
       while (!m_stop) {
         auto res = avcodec_receive_frame(*adec_ctx, *frm);
-        if (res >= 0) {
+        if (res >= 0 && timestamp(aidx) >= m_start_ts) {
           hai::holder<AVFrame, unref> fref{*frm};
 
           auto fmt = static_cast<AVSampleFormat>((*frm)->format);
