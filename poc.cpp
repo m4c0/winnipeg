@@ -8,8 +8,12 @@ import thread;
 using script_task = script::task<step>;
 
 script_task inclined_zoom(movie *mov, double ts) {
+  auto sts = mov->timestamp();
   while (mov->timestamp() < ts) {
-    co_yield {.movie_angle = 0.6};
+    co_yield {
+        .movie_angle =
+            static_cast<float>(0.6 - (mov->timestamp() - sts) * 0.02),
+    };
   }
 }
 
@@ -24,9 +28,9 @@ script_task rewind(movie *mov, double ts) {
 }
 
 script_task scr(movie *mov) {
-  mov->seek(25.0);
-  co_await wait_until(mov, 29.0);
-  co_await inclined_zoom(mov, 33.0);
+  mov->seek(25.5);
+  co_await wait_until(mov, 33.2);
+  co_await inclined_zoom(mov, 34.3);
   co_await wait_until(mov, 40.0);
 }
 
