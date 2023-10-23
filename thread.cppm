@@ -19,13 +19,16 @@ struct quad {
   };
 };
 
-export struct step {
-  float movie_angle;
+struct step_data {
+  float movie_angle{};
   float movie_scale{1.0};
+};
+export struct step {
+  step_data data{};
 };
 struct upc {
   float aspect;
-  step s;
+  step_data s;
 };
 
 using script_t = script::task<step> (*)(movie *);
@@ -163,10 +166,11 @@ void thread::run() {
       vee::wait_and_reset_fence(*f);
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
+      auto stp = scr.next();
       pc = {
           .aspect =
               static_cast<float>(ext.width) / static_cast<float>(ext.height),
-          .s = scr.next(),
+          .s = stp.data,
       };
 
       // Build command buffer

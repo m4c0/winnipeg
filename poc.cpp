@@ -10,9 +10,14 @@ using script_task = script::task<step>;
 script_task inclined_zoom(movie *mov, double ts) {
   auto sts = mov->timestamp();
   while (mov->timestamp() < ts) {
+    auto time = static_cast<float>(mov->timestamp() - sts);
+
     co_yield {
-        .movie_angle =
-            static_cast<float>(0.6 - (mov->timestamp() - sts) * 0.02),
+        .data =
+            {
+                .movie_angle = 0.6f - time * 0.02f,
+                .movie_scale = 0.5,
+            },
     };
   }
 }
