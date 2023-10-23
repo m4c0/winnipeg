@@ -1,4 +1,6 @@
 ffmpeg/include
 ffmpeg/lib
 input.*
+*.jpg
+*.png
 out
