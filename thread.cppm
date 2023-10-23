@@ -92,9 +92,9 @@ void thread::run() {
   while (!interrupted() && !scr.done()) {
     // Generic pipeline stuff
     vee::shader_module vert =
-        vee::create_shader_module_from_resource("quad.vert.spv");
+        vee::create_shader_module_from_resource("winnipeg.vert.spv");
     vee::shader_module frag =
-        vee::create_shader_module_from_resource("yul2rgb.frag.spv");
+        vee::create_shader_module_from_resource("winnipeg.frag.spv");
     vee::pipeline_layout pl = vee::create_pipeline_layout(
         {*dsl}, {vee::vert_frag_push_constant_range<upc>()});
 
