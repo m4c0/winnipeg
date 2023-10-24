@@ -33,12 +33,14 @@ struct upc {
 
 using script_t = script::task<step> (*)(movie *);
 export class thread : sith::thread, public casein::handler {
-  script_t m_script;
-  casein::native_handle_t m_nptr;
-  volatile bool m_resized;
+  casein::native_handle_t m_nptr{};
+  volatile bool m_resized{};
 
 public:
-  explicit thread(script_t s) : m_script(s) {}
+  thread() = default;
+  virtual ~thread() = default;
+
+  virtual script::task<step> scriptum(movie *) = 0;
 
   void run() override;
 
@@ -79,8 +81,9 @@ void thread::run() {
   vee::command_pool cp = vee::create_command_pool(qf);
   vee::command_buffer cb = vee::allocate_primary_command_buffer(*cp);
 
+  // Wrapped stuff
   movie mov{pd};
-  auto scr = m_script(&mov);
+  auto scr = scriptum(&mov);
 
   // Descriptor set layout + pool
   vee::sampler smp = vee::create_yuv_sampler(vee::linear_sampler, mov.conv());
