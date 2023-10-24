@@ -80,6 +80,7 @@ struct step_data {
 };
 export struct step {
   step_data data{};
+  host_image *overlay;
 };
 struct upc {
   float aspect;
@@ -233,6 +234,9 @@ void thread::run() {
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
       auto stp = scr.next();
+      if (stp.overlay)
+        vee::update_descriptor_set(dset, 1, stp.overlay->iv(), *smp);
+
       pc = {
           .aspect =
               static_cast<float>(ext.width) / static_cast<float>(ext.height),
@@ -242,6 +246,10 @@ void thread::run() {
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
       mov.run(cb);
+      if (stp.overlay) {
+        stp.overlay->run(cb);
+      }
+
       vee::cmd_begin_render_pass({
           .command_buffer = cb,
           .render_pass = *rp,
