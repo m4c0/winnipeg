@@ -8,6 +8,7 @@ import movie;
 import script;
 import silog;
 import sith;
+import stubby;
 import vee;
 
 struct quad {
@@ -17,6 +18,60 @@ struct quad {
 
       {1.0, 1.0}, {0.0, 0.0}, {0.0, 1.0},
   };
+};
+
+class host_image {
+  unsigned m_w;
+  unsigned m_h;
+
+  vee::buffer m_sbuf;
+  vee::device_memory m_smem;
+
+  vee::image m_img;
+  vee::device_memory m_mem;
+  vee::image_view m_iv;
+
+  bool m_dirty{true};
+
+public:
+  host_image(const char *file, vee::physical_device pd) {
+    stbi::load(file)
+        .map([this, pd](auto &&img) {
+          m_w = img.width;
+          m_h = img.height;
+
+          m_sbuf = vee::create_transfer_src_buffer(m_w * m_h * 4);
+          m_smem = vee::create_host_buffer_memory(pd, *m_sbuf);
+          vee::bind_buffer_memory(*m_sbuf, *m_smem);
+
+          m_img = vee::create_srgba_image({m_w, m_h});
+          m_mem = vee::create_local_image_memory(pd, *m_img);
+          vee::bind_image_memory(*m_img, *m_mem);
+          m_iv = vee::create_srgba_image_view(*m_img);
+
+          vee::mapmem m{*m_smem};
+          auto *c = static_cast<unsigned char *>(*m);
+          for (auto i = 0; i < m_w * m_h * 4; i++) {
+            c[i] = (*img.data)[i];
+          }
+        })
+        .take([file](auto msg) {
+          silog::log(silog::error, "Failed loading resource image [%s]: %s",
+                     file, msg);
+        });
+  }
+
+  [[nodiscard]] auto iv() const noexcept { return *m_iv; }
+
+  void run(vee::command_buffer cb) {
+    if (!m_dirty)
+      return;
+
+    vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);
+    vee::cmd_copy_buffer_to_image(cb, {m_w, m_h}, *m_sbuf, *m_img);
+    vee::cmd_pipeline_barrier(cb, *m_img, vee::from_transfer_to_fragment);
+    m_dirty = false;
+  }
 };
 
 struct step_data {
@@ -31,16 +86,20 @@ struct upc {
   step_data s;
 };
 
-using script_t = script::task<step> (*)(movie *);
 export class thread : sith::thread, public casein::handler {
   casein::native_handle_t m_nptr{};
+  vee::physical_device m_pd{};
+
   volatile bool m_resized{};
+
+protected:
+  virtual script::task<step> scriptum(movie *) = 0;
+
+  auto load_image(const char *file) { return host_image(file, m_pd); }
 
 public:
   thread() = default;
   virtual ~thread() = default;
-
-  virtual script::task<step> scriptum(movie *) = 0;
 
   void run() override;
 
@@ -63,6 +122,7 @@ void thread::run() {
   vee::debug_utils_messenger dbg = vee::create_debug_utils_messenger();
   vee::surface s = vee::create_surface(m_nptr);
   auto [pd, qf] = vee::find_physical_device_with_universal_queue(*s);
+  m_pd = pd;
 
   // Device
   vee::device d = vee::create_single_queue_device(pd, qf);
@@ -86,16 +146,18 @@ void thread::run() {
   auto scr = scriptum(&mov);
 
   // Descriptor set layout + pool
-  vee::sampler smp = vee::create_yuv_sampler(vee::linear_sampler, mov.conv());
+  vee::sampler yuv_smp =
+      vee::create_yuv_sampler(vee::linear_sampler, mov.conv());
   vee::descriptor_set_layout dsl = vee::create_descriptor_set_layout(
-      {vee::dsl_fragment_samplers({*smp}), vee::dsl_fragment_sampler()});
+      {vee::dsl_fragment_samplers({*yuv_smp}), vee::dsl_fragment_sampler()});
 
   vee::descriptor_pool dp =
       vee::create_descriptor_pool(1, {vee::combined_image_sampler(2)});
   vee::descriptor_set dset = vee::allocate_descriptor_set(*dp, *dsl);
 
+  vee::sampler smp = vee::create_sampler(vee::linear_sampler);
+
   vee::update_descriptor_set(dset, 0, mov.iv());
-  // vee::update_descriptor_set(dset, 1, nullptr);
 
   while (!interrupted() && !scr.done()) {
     // Generic pipeline stuff
