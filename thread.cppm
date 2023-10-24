@@ -33,21 +33,29 @@ class host_image {
 
   bool m_dirty{true};
 
+  void init(vee::physical_device pd) {
+    m_sbuf = vee::create_transfer_src_buffer(m_w * m_h * 4);
+    m_smem = vee::create_host_buffer_memory(pd, *m_sbuf);
+    vee::bind_buffer_memory(*m_sbuf, *m_smem);
+
+    m_img = vee::create_srgba_image({m_w, m_h});
+    m_mem = vee::create_local_image_memory(pd, *m_img);
+    vee::bind_image_memory(*m_img, *m_mem);
+    m_iv = vee::create_srgba_image_view(*m_img);
+  }
+
 public:
+  explicit host_image(vee::physical_device pd) {
+    m_w = 16;
+    m_h = 16;
+    init(pd);
+  }
   host_image(const char *file, vee::physical_device pd) {
     stbi::load(file)
         .map([this, pd](auto &&img) {
           m_w = img.width;
           m_h = img.height;
-
-          m_sbuf = vee::create_transfer_src_buffer(m_w * m_h * 4);
-          m_smem = vee::create_host_buffer_memory(pd, *m_sbuf);
-          vee::bind_buffer_memory(*m_sbuf, *m_smem);
-
-          m_img = vee::create_srgba_image({m_w, m_h});
-          m_mem = vee::create_local_image_memory(pd, *m_img);
-          vee::bind_image_memory(*m_img, *m_mem);
-          m_iv = vee::create_srgba_image_view(*m_img);
+          init(pd);
 
           vee::mapmem m{*m_smem};
           auto *c = static_cast<unsigned char *>(*m);
@@ -145,6 +153,7 @@ void thread::run() {
   // Wrapped stuff
   movie mov{pd};
   auto scr = scriptum(&mov);
+  host_image blank_img{pd};
 
   // Descriptor set layout + pool
   vee::sampler yuv_smp =
@@ -159,6 +168,7 @@ void thread::run() {
   vee::sampler smp = vee::create_sampler(vee::linear_sampler);
 
   vee::update_descriptor_set(dset, 0, mov.iv());
+  vee::update_descriptor_set(dset, 1, blank_img.iv());
 
   while (!interrupted() && !scr.done()) {
     // Generic pipeline stuff
@@ -234,8 +244,8 @@ void thread::run() {
       auto idx = vee::acquire_next_image(*swc, *img_available_sema);
 
       auto stp = scr.next();
-      if (stp.overlay)
-        vee::update_descriptor_set(dset, 1, stp.overlay->iv(), *smp);
+      auto ov_img = stp.overlay ? stp.overlay : &blank_img;
+      vee::update_descriptor_set(dset, 1, ov_img->iv(), *smp);
 
       pc = {
           .aspect =
@@ -246,9 +256,7 @@ void thread::run() {
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
       mov.run(cb);
-      if (stp.overlay) {
-        stp.overlay->run(cb);
-      }
+      ov_img->run(cb);
 
       vee::cmd_begin_render_pass({
           .command_buffer = cb,
