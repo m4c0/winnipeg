@@ -75,7 +75,7 @@ public:
 
   [[nodiscard]] auto timestamp() const noexcept { return m_player.timestamp(); }
 
-  void run(vee::command_buffer cb, bool paused) {
+  void pause(bool paused) {
     if (paused && !m_prev_paused) {
       m_seek += m_watch.millis();
       m_prev_paused = true;
@@ -83,7 +83,9 @@ public:
       m_watch = {};
       m_prev_paused = false;
     }
-    if (paused)
+  }
+  void run(vee::command_buffer cb) {
+    if (m_prev_paused)
       return;
 
     if (m_coro.done() || m_coro.promise().failed)

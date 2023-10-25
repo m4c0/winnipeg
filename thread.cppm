@@ -253,6 +253,8 @@ void thread::run() {
       auto ov_img = stp.overlay ? stp.overlay : &blank_img;
       vee::update_descriptor_set(dset, 1, ov_img->iv(), *smp);
 
+      mov.pause(m_paused);
+
       pc = {
           .aspect =
               static_cast<float>(ext.width) / static_cast<float>(ext.height),
@@ -261,7 +263,7 @@ void thread::run() {
 
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
-      mov.run(cb, m_paused);
+      mov.run(cb);
       ov_img->run(cb);
 
       vee::cmd_begin_render_pass({
