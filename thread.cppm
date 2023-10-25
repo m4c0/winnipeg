@@ -102,6 +102,7 @@ export class thread : sith::thread, public casein::handler {
   vee::physical_device m_pd{};
 
   volatile bool m_resized{};
+  volatile bool m_paused{};
 
 protected:
   virtual script::task<step> scriptum(movie *) = 0;
@@ -117,6 +118,9 @@ public:
   void create_window(const casein::events::create_window &e) override {
     m_nptr = *e;
     start();
+  }
+  void key_down(const casein::events::key_down &e) override {
+    m_paused = !m_paused;
   }
   void resize_window(const casein::events::resize_window &e) override {
     if ((*e).live)
@@ -257,7 +261,7 @@ void thread::run() {
 
       // Build command buffer
       vee::begin_cmd_buf_one_time_submit(cb);
-      mov.run(cb);
+      mov.run(cb, m_paused);
       ov_img->run(cb);
 
       vee::cmd_begin_render_pass({

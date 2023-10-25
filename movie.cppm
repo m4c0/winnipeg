@@ -27,6 +27,7 @@ export class movie {
   player_promise::coro m_coro;
   sitime::stopwatch m_watch{};
   unsigned m_seek{};
+  bool m_prev_paused{false};
 
   vee::extent m_ext;
 
@@ -74,7 +75,17 @@ public:
 
   [[nodiscard]] auto timestamp() const noexcept { return m_player.timestamp(); }
 
-  void run(vee::command_buffer cb) {
+  void run(vee::command_buffer cb, bool paused) {
+    if (paused && !m_prev_paused) {
+      m_seek += m_watch.millis();
+      m_prev_paused = true;
+    } else if (!paused && m_prev_paused) {
+      m_watch = {};
+      m_prev_paused = false;
+    }
+    if (paused)
+      return;
+
     if (m_coro.done() || m_coro.promise().failed)
       return;
 
