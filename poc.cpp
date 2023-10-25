@@ -14,7 +14,6 @@ class sthread : public thread {
 
   constexpr auto mov() noexcept { return m_mov; }
 
-public:
   script_task inclined_zoom(double ts) {
     auto sts = mov()->timestamp();
     while (mov()->timestamp() < ts) {
@@ -23,8 +22,8 @@ public:
       co_yield {
           .data =
               {
-                  .movie_angle = 0.6f - time * 0.02f,
-                  .movie_scale = 0.5,
+                  .angle = 0.6f - time * 0.02f,
+                  .scale = 0.5,
               },
       };
     }
@@ -33,6 +32,11 @@ public:
   script_task overlay(auto *o, double ts) {
     while (mov()->timestamp() < ts) {
       co_yield {
+          .data =
+              {
+                  .scale = 2.0,
+                  .pos_y = 0.5,
+              },
           .overlay = o,
       };
     }
@@ -48,6 +52,7 @@ public:
     co_yield {};
   }
 
+public:
   script_task scriptum(movie *mov) override {
     m_mov = mov;
     auto img1 = load_image(image_1);

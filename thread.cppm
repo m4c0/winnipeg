@@ -83,8 +83,10 @@ public:
 };
 
 struct step_data {
-  float movie_angle{};
-  float movie_scale{1.0};
+  float angle{};
+  float scale{1.0};
+  float pos_x{};
+  float pos_y{};
 };
 export struct step {
   step_data data{};
