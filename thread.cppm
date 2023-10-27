@@ -191,7 +191,6 @@ void thread::run() {
 
       vee::cmd_bind_vertex_buffers(cb, 0, *q_buf);
       vee::cmd_draw(cb, 6);
-      vee::cmd_end_render_pass(cb);
     };
 
     m_resized = false;
@@ -236,6 +235,7 @@ void thread::run() {
         vee::cmd_set_viewport(cb, ext);
         vee::cmd_bind_gr_pipeline(cb, *gp);
         render(fbs[idx]);
+        vee::cmd_end_render_pass(cb);
       }
 
       vee::queue_submit({
