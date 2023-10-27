@@ -10,6 +10,7 @@ import silog;
 import sith;
 import stubby;
 import vee;
+import voo;
 
 struct quad {
   static constexpr const auto v_count = 6;
@@ -20,68 +21,6 @@ struct quad {
   };
 };
 
-class host_image {
-  unsigned m_w;
-  unsigned m_h;
-
-  vee::buffer m_sbuf;
-  vee::device_memory m_smem;
-
-  vee::image m_img;
-  vee::device_memory m_mem;
-  vee::image_view m_iv;
-
-  bool m_dirty{true};
-
-  void init(vee::physical_device pd) {
-    m_sbuf = vee::create_transfer_src_buffer(m_w * m_h * 4);
-    m_smem = vee::create_host_buffer_memory(pd, *m_sbuf);
-    vee::bind_buffer_memory(*m_sbuf, *m_smem);
-
-    m_img = vee::create_srgba_image({m_w, m_h});
-    m_mem = vee::create_local_image_memory(pd, *m_img);
-    vee::bind_image_memory(*m_img, *m_mem);
-    m_iv = vee::create_srgba_image_view(*m_img);
-  }
-
-public:
-  explicit host_image(vee::physical_device pd) {
-    m_w = 16;
-    m_h = 16;
-    init(pd);
-  }
-  host_image(const char *file, vee::physical_device pd) {
-    stbi::load(file)
-        .map([this, pd](auto &&img) {
-          m_w = img.width;
-          m_h = img.height;
-          init(pd);
-
-          vee::mapmem m{*m_smem};
-          auto *c = static_cast<unsigned char *>(*m);
-          for (auto i = 0; i < m_w * m_h * 4; i++) {
-            c[i] = (*img.data)[i];
-          }
-        })
-        .take([file](auto msg) {
-          silog::log(silog::error, "Failed loading resource image [%s]: %s",
-                     file, msg);
-        });
-  }
-
-  [[nodiscard]] auto iv() const noexcept { return *m_iv; }
-
-  void run(vee::command_buffer cb) {
-    if (!m_dirty)
-      return;
-
-    vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);
-    vee::cmd_copy_buffer_to_image(cb, {m_w, m_h}, *m_sbuf, *m_img);
-    vee::cmd_pipeline_barrier(cb, *m_img, vee::from_transfer_to_fragment);
-    m_dirty = false;
-  }
-};
-
 struct step_data {
   float angle{};
   float scale{1.0};
@@ -90,7 +29,7 @@ struct step_data {
 };
 export struct step {
   step_data data{};
-  host_image *overlay;
+  voo::sires_image *overlay;
 };
 struct upc {
   float aspect;
@@ -109,7 +48,7 @@ export class thread : sith::thread, public casein::handler {
 protected:
   virtual script::task<step> scriptum(movie *) = 0;
 
-  auto load_image(const char *file) { return host_image(file, m_pd); }
+  auto load_image(const char *file) { return voo::sires_image(file, m_pd); }
 
 public:
   thread() = default;
@@ -170,7 +109,7 @@ void thread::run() {
   // Wrapped stuff
   movie mov{pd};
   auto scr = scriptum(&mov);
-  host_image blank_img{pd};
+  voo::sires_image blank_img{pd};
 
   // Descriptor set layout + pool
   vee::sampler yuv_smp =
@@ -273,30 +212,31 @@ void thread::run() {
       };
 
       // Build command buffer
-      vee::begin_cmd_buf_one_time_submit(cb);
-      if (m_step && m_paused) {
-        mov.pause(false);
-        mov.run(cb);
-        mov.pause(true);
-        m_step = false;
-      } else {
-        mov.run(cb);
-      }
-      ov_img->run(cb);
+      {
+        voo::cmd_buf_one_time_submit pcm{cb};
+        if (m_step && m_paused) {
+          mov.pause(false);
+          mov.run(cb);
+          mov.pause(true);
+          m_step = false;
+        } else {
+          mov.run(cb);
+        }
+        ov_img->run(pcm);
 
-      vee::cmd_begin_render_pass({
-          .command_buffer = cb,
-          .render_pass = *rp,
-          .framebuffer = *fbs[idx],
-          .extent = ext,
-          .clear_color = {{0.1, 0.2, 0.3, 1.0}},
-          .use_secondary_cmd_buf = false,
-      });
-      vee::cmd_set_scissor(cb, ext);
-      vee::cmd_set_viewport(cb, ext);
-      vee::cmd_bind_gr_pipeline(cb, *gp);
-      render(fbs[idx]);
-      vee::end_cmd_buf(cb);
+        vee::cmd_begin_render_pass({
+            .command_buffer = cb,
+            .render_pass = *rp,
+            .framebuffer = *fbs[idx],
+            .extent = ext,
+            .clear_color = {{0.1, 0.2, 0.3, 1.0}},
+            .use_secondary_cmd_buf = false,
+        });
+        vee::cmd_set_scissor(cb, ext);
+        vee::cmd_set_viewport(cb, ext);
+        vee::cmd_bind_gr_pipeline(cb, *gp);
+        render(fbs[idx]);
+      }
 
       vee::queue_submit({
           .queue = q,
