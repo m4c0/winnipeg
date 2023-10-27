@@ -82,16 +82,12 @@ public:
 };
 
 void thread::run() {
-  // Instance
-  vee::instance i = vee::create_instance("winnipeg");
-  vee::debug_utils_messenger dbg = vee::create_debug_utils_messenger();
-  vee::surface s = vee::create_surface(m_nptr);
-  auto [pd, qf] = vee::find_physical_device_with_universal_queue(*s);
+  voo::device_and_queue dq{"winnipeg", m_nptr};
+  auto cp = dq.command_pool();
+  auto pd = dq.physical_device();
+  auto q = dq.queue();
+  auto s = dq.surface();
   m_pd = pd;
-
-  // Device
-  vee::device d = vee::create_single_queue_device(pd, qf);
-  vee::queue q = vee::get_queue_for_family(qf);
 
   // Inputs (vertices + instance)
   vee::buffer q_buf = vee::create_vertex_buffer(sizeof(quad));
@@ -103,8 +99,7 @@ void thread::run() {
   }
 
   // Command pool + buffer
-  vee::command_pool cp = vee::create_command_pool(qf);
-  vee::command_buffer cb = vee::allocate_primary_command_buffer(*cp);
+  vee::command_buffer cb = vee::allocate_primary_command_buffer(cp);
 
   // Wrapped stuff
   movie mov{pd};
@@ -156,25 +151,25 @@ void thread::run() {
     vee::fence f = vee::create_fence_signaled();
 
     // Depth buffer
-    vee::image d_img = vee::create_depth_image(pd, *s);
+    vee::image d_img = vee::create_depth_image(pd, s);
     vee::device_memory d_mem = vee::create_local_image_memory(pd, *d_img);
     [[maybe_unused]] decltype(nullptr) d_bind =
         vee::bind_image_memory(*d_img, *d_mem);
     vee::image_view d_iv = vee::create_depth_image_view(*d_img);
 
-    vee::swapchain swc = vee::create_swapchain(pd, *s);
-    vee::extent ext = vee::get_surface_capabilities(pd, *s).currentExtent;
-    vee::render_pass rp = vee::create_render_pass(pd, *s);
+    vee::swapchain swc = vee::create_swapchain(pd, s);
+    vee::extent ext = vee::get_surface_capabilities(pd, s).currentExtent;
+    vee::render_pass rp = vee::create_render_pass(pd, s);
 
     auto swc_imgs = vee::get_swapchain_images(*swc);
     hai::array<vee::image_view> c_ivs{swc_imgs.size()};
     hai::array<vee::framebuffer> fbs{swc_imgs.size()};
 
     for (auto i = 0; i < swc_imgs.size(); i++) {
-      c_ivs[i] = vee::create_rgba_image_view(swc_imgs[i], pd, *s);
+      c_ivs[i] = vee::create_rgba_image_view(swc_imgs[i], pd, s);
       fbs[i] = vee::create_framebuffer({
           .physical_device = pd,
-          .surface = *s,
+          .surface = s,
           .render_pass = *rp,
           .image_buffer = *c_ivs[i],
           .depth_buffer = *d_iv,
