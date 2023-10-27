@@ -212,7 +212,7 @@ void thread::run() {
 
       // Build command buffer
       {
-        voo::cmd_buf_one_time_submit pcm{cb};
+        voo::cmd_buf_one_time_submit pcb{cb};
         if (m_step && m_paused) {
           mov.pause(false);
           mov.run(cb);
@@ -221,9 +221,9 @@ void thread::run() {
         } else {
           mov.run(cb);
         }
-        ov_img->run(pcm);
+        ov_img->run(pcb);
 
-        vee::cmd_begin_render_pass({
+        voo::cmd_render_pass scb({
             .command_buffer = cb,
             .render_pass = *rp,
             .framebuffer = *fbs[idx],
@@ -231,11 +231,8 @@ void thread::run() {
             .clear_color = {{0.1, 0.2, 0.3, 1.0}},
             .use_secondary_cmd_buf = false,
         });
-        vee::cmd_set_scissor(cb, ext);
-        vee::cmd_set_viewport(cb, ext);
         vee::cmd_bind_gr_pipeline(cb, *gp);
         render(fbs[idx]);
-        vee::cmd_end_render_pass(cb);
       }
 
       vee::queue_submit({
