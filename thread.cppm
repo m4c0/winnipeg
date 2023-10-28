@@ -125,10 +125,8 @@ void thread::run() {
 
       mov.pause(m_paused);
 
-      auto ext = sw.extent();
       pc = {
-          .aspect =
-              static_cast<float>(ext.width) / static_cast<float>(ext.height),
+          .aspect = sw.aspect(),
           .s = stp.data,
       };
 
