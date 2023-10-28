@@ -144,8 +144,7 @@ void thread::run() {
         vee::cmd_bind_descriptor_set(cb, *pl, 0, dset);
         vee::cmd_push_vert_frag_constants(cb, *pl, &pc);
 
-        quad.cmd_bind_vertex_buffer(cb, 0);
-        vee::cmd_draw(cb, 6);
+        quad.run(scb, 0);
       }
 
       sw.queue_submit(q, cb);
