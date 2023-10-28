@@ -36,11 +36,8 @@ struct upc {
   step_data s;
 };
 
-export class thread : sith::thread, public casein::handler {
-  casein::native_handle_t m_nptr{};
+export class thread : public voo::casein_thread {
   vee::physical_device m_pd{};
-
-  volatile bool m_resized{};
 
   volatile bool m_paused{};
   volatile bool m_step{};
@@ -51,15 +48,8 @@ protected:
   auto load_image(const char *file) { return voo::sires_image(file, m_pd); }
 
 public:
-  thread() = default;
-  virtual ~thread() = default;
-
   void run() override;
 
-  void create_window(const casein::events::create_window &e) override {
-    m_nptr = *e;
-    start();
-  }
   void key_down(const casein::events::key_down &e) override {
     switch (*e) {
     case casein::K_SPACE:
@@ -72,17 +62,10 @@ public:
       break;
     }
   }
-  void resize_window(const casein::events::resize_window &e) override {
-    if ((*e).live)
-      return;
-
-    m_resized = true;
-  }
-  void quit(const casein::events::quit &e) override {}
 };
 
 void thread::run() {
-  voo::device_and_queue dq{"winnipeg", m_nptr};
+  voo::device_and_queue dq{"winnipeg", native_ptr()};
   auto cp = dq.command_pool();
   auto pd = dq.physical_device();
   auto q = dq.queue();
@@ -151,8 +134,8 @@ void thread::run() {
 
     upc pc{};
 
-    m_resized = false;
-    while (!interrupted() && !m_resized && !scr.done()) {
+    resized() = false;
+    while (!interrupted() && !resized() && !scr.done()) {
       sw.acquire_next_image();
 
       auto stp = scr.next();
