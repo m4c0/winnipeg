@@ -98,10 +98,10 @@ void thread::run() {
               voo::shader("winnipeg.frag.spv").pipeline_frag_stage(),
           },
           {
-              vee::vertex_input_bind(sizeof(float) * 2),
+              quad.vertex_input_bind(),
           },
           {
-              vee::vertex_attribute_vec2(0, 0),
+              quad.vertex_attribute(0),
           });
     };
 
