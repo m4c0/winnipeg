@@ -3,12 +3,9 @@ export module thread;
 #pragma leco add_shader "winnipeg.frag"
 import casein;
 import coro;
-import hai;
 import movie;
 import script;
 import silog;
-import sith;
-import stubby;
 import vee;
 import voo;
 
