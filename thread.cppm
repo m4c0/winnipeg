@@ -87,10 +87,6 @@ void thread::run() {
 
   while (!interrupted() && !scr.done()) {
     // Generic pipeline stuff
-    vee::shader_module vert =
-        vee::create_shader_module_from_resource("winnipeg.vert.spv");
-    vee::shader_module frag =
-        vee::create_shader_module_from_resource("winnipeg.frag.spv");
     vee::pipeline_layout pl = vee::create_pipeline_layout(
         {*dsl}, {vee::vert_frag_push_constant_range<upc>()});
 
@@ -98,8 +94,8 @@ void thread::run() {
       return vee::create_graphics_pipeline(
           *pl, rp,
           {
-              vee::pipeline_vert_stage(*vert, "main"),
-              vee::pipeline_frag_stage(*frag, "main"),
+              voo::shader("winnipeg.vert.spv").pipeline_vert_stage(),
+              voo::shader("winnipeg.frag.spv").pipeline_frag_stage(),
           },
           {
               vee::vertex_input_bind(sizeof(float) * 2),
