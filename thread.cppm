@@ -9,15 +9,6 @@ import silog;
 import vee;
 import voo;
 
-struct quad {
-  static constexpr const auto v_count = 6;
-  float p[v_count][2]{
-      {0.0, 0.0}, {1.0, 1.0}, {1.0, 0.0},
-
-      {1.0, 1.0}, {0.0, 0.0}, {0.0, 1.0},
-  };
-};
-
 struct step_data {
   float angle{};
   float scale{1.0};
@@ -69,14 +60,7 @@ void thread::run() {
   auto s = dq.surface();
   m_pd = pd;
 
-  // Inputs (vertices + instance)
-  vee::buffer q_buf = vee::create_vertex_buffer(sizeof(quad));
-  vee::device_memory q_mem = vee::create_host_buffer_memory(pd, sizeof(quad));
-  vee::bind_buffer_memory(*q_buf, *q_mem, 0);
-  {
-    vee::mapmem mem{*q_mem};
-    *static_cast<quad *>(*mem) = {};
-  }
+  voo::one_quad quad{pd};
 
   // Command pool + buffer
   vee::command_buffer cb = vee::allocate_primary_command_buffer(cp);
@@ -166,7 +150,7 @@ void thread::run() {
         vee::cmd_bind_descriptor_set(cb, *pl, 0, dset);
         vee::cmd_push_vert_frag_constants(cb, *pl, &pc);
 
-        vee::cmd_bind_vertex_buffers(cb, 0, *q_buf);
+        quad.cmd_bind_vertex_buffer(cb, 0);
         vee::cmd_draw(cb, 6);
       }
 
