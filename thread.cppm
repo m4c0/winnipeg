@@ -130,9 +130,9 @@ void thread::run() {
     vee::pipeline_layout pl = vee::create_pipeline_layout(
         {*dsl}, {vee::vert_frag_push_constant_range<upc>()});
 
-    auto create_grp = [&](const vee::render_pass &rp) {
+    auto create_grp = [&](vee::render_pass::type rp) {
       return vee::create_graphics_pipeline(
-          *pl, *rp,
+          *pl, rp,
           {
               vee::pipeline_vert_stage(*vert, "main"),
               vee::pipeline_frag_stage(*frag, "main"),
@@ -145,42 +145,13 @@ void thread::run() {
           });
     };
 
-    // Sync stuff
-    vee::semaphore img_available_sema = vee::create_semaphore();
-    vee::semaphore rnd_finished_sema = vee::create_semaphore();
-    vee::fence f = vee::create_fence_signaled();
+    voo::swapchain_and_stuff sw{pd, s};
 
-    // Depth buffer
-    vee::image d_img = vee::create_depth_image(pd, s);
-    vee::device_memory d_mem = vee::create_local_image_memory(pd, *d_img);
-    [[maybe_unused]] decltype(nullptr) d_bind =
-        vee::bind_image_memory(*d_img, *d_mem);
-    vee::image_view d_iv = vee::create_depth_image_view(*d_img);
-
-    vee::swapchain swc = vee::create_swapchain(pd, s);
-    vee::extent ext = vee::get_surface_capabilities(pd, s).currentExtent;
-    vee::render_pass rp = vee::create_render_pass(pd, s);
-
-    auto swc_imgs = vee::get_swapchain_images(*swc);
-    hai::array<vee::image_view> c_ivs{swc_imgs.size()};
-    hai::array<vee::framebuffer> fbs{swc_imgs.size()};
-
-    for (auto i = 0; i < swc_imgs.size(); i++) {
-      c_ivs[i] = vee::create_rgba_image_view(swc_imgs[i], pd, s);
-      fbs[i] = vee::create_framebuffer({
-          .physical_device = pd,
-          .surface = s,
-          .render_pass = *rp,
-          .image_buffer = *c_ivs[i],
-          .depth_buffer = *d_iv,
-      });
-    }
-
-    vee::gr_pipeline gp = create_grp(rp);
+    vee::gr_pipeline gp = create_grp(sw.render_pass());
 
     upc pc{};
 
-    const auto render = [&](auto &fb) {
+    const auto render = [&] {
       vee::cmd_bind_descriptor_set(cb, *pl, 0, dset);
       vee::cmd_push_vert_frag_constants(cb, *pl, &pc);
 
@@ -190,8 +161,7 @@ void thread::run() {
 
     m_resized = false;
     while (!interrupted() && !m_resized && !scr.done()) {
-      vee::wait_and_reset_fence(*f);
-      auto idx = vee::acquire_next_image(*swc, *img_available_sema);
+      sw.acquire_next_image();
 
       auto stp = scr.next();
       auto ov_img = stp.overlay ? stp.overlay : &blank_img;
@@ -199,6 +169,7 @@ void thread::run() {
 
       mov.pause(m_paused);
 
+      auto ext = sw.extent();
       pc = {
           .aspect =
               static_cast<float>(ext.width) / static_cast<float>(ext.height),
@@ -218,31 +189,13 @@ void thread::run() {
         }
         ov_img->run(pcb);
 
-        voo::cmd_render_pass scb({
-            .command_buffer = cb,
-            .render_pass = *rp,
-            .framebuffer = *fbs[idx],
-            .extent = ext,
-            .clear_color = {{0.1, 0.2, 0.3, 1.0}},
-            .use_secondary_cmd_buf = false,
-        });
+        auto scb = sw.cmd_render_pass(cb);
         vee::cmd_bind_gr_pipeline(cb, *gp);
-        render(fbs[idx]);
+        render();
       }
 
-      vee::queue_submit({
-          .queue = q,
-          .fence = *f,
-          .command_buffer = cb,
-          .wait_semaphore = *img_available_sema,
-          .signal_semaphore = *rnd_finished_sema,
-      });
-      vee::queue_present({
-          .queue = q,
-          .swapchain = *swc,
-          .wait_semaphore = *rnd_finished_sema,
-          .image_index = idx,
-      });
+      sw.queue_submit(q, cb);
+      sw.queue_present(q);
     }
 
     vee::device_wait_idle();
