@@ -151,14 +151,6 @@ void thread::run() {
 
     upc pc{};
 
-    const auto render = [&] {
-      vee::cmd_bind_descriptor_set(cb, *pl, 0, dset);
-      vee::cmd_push_vert_frag_constants(cb, *pl, &pc);
-
-      vee::cmd_bind_vertex_buffers(cb, 0, *q_buf);
-      vee::cmd_draw(cb, 6);
-    };
-
     m_resized = false;
     while (!interrupted() && !m_resized && !scr.done()) {
       sw.acquire_next_image();
@@ -191,7 +183,11 @@ void thread::run() {
 
         auto scb = sw.cmd_render_pass(cb);
         vee::cmd_bind_gr_pipeline(cb, *gp);
-        render();
+        vee::cmd_bind_descriptor_set(cb, *pl, 0, dset);
+        vee::cmd_push_vert_frag_constants(cb, *pl, &pc);
+
+        vee::cmd_bind_vertex_buffers(cb, 0, *q_buf);
+        vee::cmd_draw(cb, 6);
       }
 
       sw.queue_submit(q, cb);
