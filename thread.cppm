@@ -91,18 +91,20 @@ void thread::run() {
         {*dsl}, {vee::vert_frag_push_constant_range<upc>()});
 
     auto create_grp = [&](vee::render_pass::type rp) {
-      return vee::create_graphics_pipeline(
-          *pl, rp,
-          {
+      return vee::create_graphics_pipeline({
+          .pipeline_layout = *pl,
+          .render_pass = rp,
+          .shaders{
               voo::shader("winnipeg.vert.spv").pipeline_vert_stage(),
               voo::shader("winnipeg.frag.spv").pipeline_frag_stage(),
           },
-          {
+          .bindings{
               quad.vertex_input_bind(),
           },
-          {
+          .attributes{
               quad.vertex_attribute(0),
-          });
+          },
+      });
     };
 
     voo::swapchain_and_stuff sw{pd, s};
