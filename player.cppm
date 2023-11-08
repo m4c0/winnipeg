@@ -1,7 +1,8 @@
 module;
 #pragma leco add_include_dir "ffmpeg/include"
-#pragma leco add_library "ffmpeg/lib/libavcodec.dylib"
-#pragma leco add_library "ffmpeg/lib/libavformat.dylib"
+#pragma leco add_library_dir "ffmpeg/lib"
+#pragma leco add_library "avcodec"
+#pragma leco add_library "avformat"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
