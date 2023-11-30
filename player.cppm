@@ -40,7 +40,7 @@ inline int assert_p(int i, const char *msg) {
 }
 
 export struct player_promise {
-  using coro = ::coro<player_promise>;
+  using coro = coro::t<player_promise>;
 
   AVFrame *value;
   bool failed;
