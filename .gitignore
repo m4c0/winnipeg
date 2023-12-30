@@ -1,5 +1,4 @@
-ffmpeg/include
-ffmpeg/lib
+ffmpeg/*
 input.*
 *.jpg
 *.png
