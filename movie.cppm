@@ -1,4 +1,5 @@
 export module movie;
+import ffmod;
 import player;
 import silog;
 import sitime;
@@ -20,7 +21,7 @@ public:
   }
 
   [[nodiscard]] auto operator*() { return *m_buf; }
-  [[nodiscard]] auto map() { return vee::mapmem(*m_mem); }
+  [[nodiscard]] auto map() { return voo::mapmem(*m_mem); }
 };
 
 export class movie {
@@ -111,22 +112,11 @@ public:
 
     auto y = m_buf_y.map();
     auto *yy = static_cast<unsigned char *>(*y);
-    for (auto y = 0; y < m_ext.height; y++) {
-      for (auto x = 0; x < m_ext.width; x++) {
-        *yy++ = frm->data[0][y * frm->linesize[0] + x];
-      }
-    }
-
     auto u = m_buf_u.map();
     auto *uu = static_cast<unsigned char *>(*u);
     auto v = m_buf_v.map();
     auto *vv = static_cast<unsigned char *>(*v);
-    for (auto y = 0; y < m_ext.height / 2; y++) {
-      for (auto x = 0; x < m_ext.width / 2; x++) {
-        *uu++ = frm->data[1][y * frm->linesize[1] + x];
-        *vv++ = frm->data[2][y * frm->linesize[2] + x];
-      }
-    }
+    ffmod::copy_frame_yuv(*frm, yy, uu, vv);
 
     vee::cmd_pipeline_barrier(cb, *m_img, vee::from_host_to_transfer);
     vee::cmd_copy_yuv420p_buffers_to_image(cb, m_ext, *m_buf_y, *m_buf_u,
