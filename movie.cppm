@@ -3,6 +3,7 @@ import player;
 import silog;
 import sitime;
 import vee;
+import voo;
 
 static constexpr const auto input_filename = "input.mkv";
 
