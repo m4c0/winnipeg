@@ -1,22 +1,29 @@
 export module decoder;
 import ffmod;
+import hai;
 import silog;
 import sith;
+import voo;
 
-class decoder : public sith::thread {
+class decoder : public voo::update_thread {
   ffmod::fmt_ctx m_ctx;
+  hai::array<ffmod::codec_ctx> m_decs;
+  voo::h2l_yuv_image m_img;
 
 public:
-  explicit decoder(const char *filename)
-      : m_ctx{ffmod::avformat_open_input(filename)} {}
+  explicit decoder(voo::device_and_queue *dq, const char *filename)
+      : update_thread{dq}
+      , m_ctx{ffmod::avformat_open_input(filename)}
+      , m_decs{ffmod::avcodec_open_all(m_ctx)}
+      , m_img{*dq, static_cast<unsigned>((*m_decs[0])->width),
+              static_cast<unsigned>((*m_decs[0])->height)} {
+    silog::assert((*m_decs[0])->codec_type == AVMEDIA_TYPE_VIDEO,
+                  "invalid movie format");
+    silog::assert((*m_decs[1])->codec_type == AVMEDIA_TYPE_AUDIO,
+                  "invalid movie format");
+  }
 
   void run() override {
-    auto decs = ffmod::avcodec_open_all(m_ctx);
-    silog::assert((*decs[0])->codec_type == AVMEDIA_TYPE_VIDEO,
-                  "invalid movie format");
-    silog::assert((*decs[1])->codec_type == AVMEDIA_TYPE_AUDIO,
-                  "invalid movie format");
-
     auto pkt = ffmod::av_packet_alloc();
     auto frm = ffmod::av_frame_alloc();
     while (!interrupted()) {
@@ -25,7 +32,7 @@ public:
         break;
 
       auto idx = (*pkt)->stream_index;
-      auto &dec = decs[idx];
+      auto &dec = m_decs[idx];
 
       ffmod::avcodec_send_packet(dec, pkt);
       while (!interrupted()) {
@@ -34,7 +41,14 @@ public:
           break;
 
         if ((*dec)->codec_type == AVMEDIA_TYPE_VIDEO) {
-          // ffmod::copy_frame_yuv(frm, y, u, v);
+          voo::mapmem y{m_img.host_memory_y()};
+          voo::mapmem u{m_img.host_memory_u()};
+          voo::mapmem v{m_img.host_memory_v()};
+
+          ffmod::copy_frame_yuv(frm, static_cast<unsigned char *>(*y),
+                                static_cast<unsigned char *>(*u),
+                                static_cast<unsigned char *>(*v));
+          run_once();
         } else if ((*dec)->codec_type == AVMEDIA_TYPE_AUDIO) {
           // auto num_samples = (*frm)->nb_samples;
           // auto sample_rate = (*frm)->sample_rate;
@@ -44,4 +58,3 @@ public:
     }
   }
 };
-
