@@ -59,6 +59,9 @@ public:
                   "invalid movie format");
     silog::assert((*m_decs[1])->codec_type == AVMEDIA_TYPE_AUDIO,
                   "invalid movie format");
+
+    // decode a frame earlier to avoid using an unprepared image
+    run_once();
   }
 
   [[nodiscard]] constexpr auto conv() const noexcept { return m_img.conv(); }
