@@ -3,12 +3,18 @@ import ffmod;
 import hai;
 import silog;
 import sith;
+import vee;
 import voo;
 
-class decoder : public voo::update_thread {
+export class decoder : public voo::update_thread {
   ffmod::fmt_ctx m_ctx;
   hai::array<ffmod::codec_ctx> m_decs;
   voo::h2l_yuv_image m_img;
+
+  void build_cmd_buf(vee::command_buffer cb) override {
+    voo::cmd_buf_one_time_submit pcb{cb};
+    m_img.setup_copy(cb);
+  }
 
 public:
   explicit decoder(voo::device_and_queue *dq, const char *filename)
@@ -22,6 +28,8 @@ public:
     silog::assert((*m_decs[1])->codec_type == AVMEDIA_TYPE_AUDIO,
                   "invalid movie format");
   }
+
+  [[nodiscard]] constexpr auto conv() const noexcept { return m_img.conv(); }
 
   void run() override {
     auto pkt = ffmod::av_packet_alloc();
