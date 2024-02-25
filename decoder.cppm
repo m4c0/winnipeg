@@ -30,6 +30,7 @@ public:
   }
 
   [[nodiscard]] constexpr auto conv() const noexcept { return m_img.conv(); }
+  [[nodiscard]] constexpr auto iv() const noexcept { return m_img.iv(); }
 
   void run() override {
     auto pkt = ffmod::av_packet_alloc();
